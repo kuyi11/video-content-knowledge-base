@@ -6,7 +6,7 @@ from pathlib import Path
 
 import ollama
 
-from config import INDEX_DIR, LLM_CONFIG, TERMINOLOGY_REVIEW_PATH
+from config import INDEX_DIR, LLM_CONFIG, QUERY_LOGGING_ENABLED, TERMINOLOGY_REVIEW_PATH
 from modules.claim_judge import ClaimJudge, OllamaClaimJudge
 from modules.claim_grounding import is_abstention_answer, not_applicable, validate_claims
 from modules.medical_safety import evaluate_medical_safety, load_review_rules
@@ -146,10 +146,10 @@ def answer_question_with_usage(
     result = engine.query(question, **query_kwargs)
     if empty := _handle_empty(result):
         grounding = not_applicable("retrieval_empty")
-        log_path = _write_query_log(
+        log_path = _maybe_write_query_log(
             question, result, empty, {}, safety=None, grounding=grounding
         )
-        usage = {"retrieval_log_path": str(log_path), "claim_grounding": grounding}
+        usage = {"retrieval_log_path": str(log_path) if log_path else None, "claim_grounding": grounding}
         if include_retrieval:
             usage["retrieval"] = result
         return empty, usage
@@ -167,11 +167,11 @@ def answer_question_with_usage(
             "请回看原视频并由专业人员复核。"
         )
         grounding = not_applicable("medical_safety_block")
-        log_path = _write_query_log(
+        log_path = _maybe_write_query_log(
             question, result, answer, {}, safety=safety.to_dict(), grounding=grounding
         )
         usage = {
-            "retrieval_log_path": str(log_path),
+            "retrieval_log_path": str(log_path) if log_path else None,
             "safety_gate": safety.to_dict(),
             "claim_grounding": grounding,
         }
@@ -203,16 +203,22 @@ def answer_question_with_usage(
             result["results"],
             semantic_judge=semantic_judge if semantic_grounding else None,
         )
-    log_path = _write_query_log(
+    log_path = _maybe_write_query_log(
         question, result, answer, usage, safety=safety.to_dict(), grounding=grounding
     )
     usage = dict(usage)
-    usage["retrieval_log_path"] = str(log_path)
+    usage["retrieval_log_path"] = str(log_path) if log_path else None
     usage["safety_gate"] = safety.to_dict()
     usage["claim_grounding"] = grounding
     if include_retrieval:
         usage["retrieval"] = result
     return answer, usage
+
+
+def _maybe_write_query_log(*args, **kwargs) -> Path | None:
+    if not QUERY_LOGGING_ENABLED:
+        return None
+    return _write_query_log(*args, **kwargs)
 
 
 def _write_query_log(

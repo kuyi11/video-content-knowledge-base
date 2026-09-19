@@ -188,6 +188,8 @@ EMBEDDING_BATCH_SIZE = int(os.environ.get("EMBEDDING_BATCH_SIZE", "32"))
 # === LLM 配置 ===
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", os.environ.get("LLM_BASE_URL", "http://localhost:11434"))
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", os.environ.get("LLM_MODEL", "qwen2.5:7b"))
+QUERY_LOGGING_ENABLED = os.environ.get("QUERY_LOGGING_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+API_TOKEN = os.environ.get("API_TOKEN", "").strip()
 LLM_NUM_CTX = int(os.environ.get("LLM_NUM_CTX", "16384"))
 LLM_NUM_PREDICT = int(os.environ.get("LLM_NUM_PREDICT", "4096"))
 LLM_KEEP_ALIVE = os.environ.get("LLM_KEEP_ALIVE", "15m")
@@ -219,6 +221,9 @@ LLM_CONFIG = {
     "num_predict": LLM_NUM_PREDICT,
     "keep_alive": LLM_KEEP_ALIVE,
 }
+
+if OLLAMA_HOST and not OLLAMA_HOST.lower().startswith(("http://localhost", "http://127.0.0.1", "https://localhost", "https://127.0.0.1")):
+    logging.getLogger(__name__).warning("OLLAMA_HOST is remote; prompts and retrieved context may leave this machine: %s", OLLAMA_HOST)
 
 # === Obsidian 配置 ===
 VAULT_VIDEOS_PATH = VAULT_DIR

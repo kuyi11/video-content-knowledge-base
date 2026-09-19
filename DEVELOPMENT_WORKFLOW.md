@@ -63,3 +63,6 @@ git push origin public-main:main
 - 不要从原始目录向 `origin/main` 推送。
 - 不要提交真实字幕、医疗笔记、个人知识库、索引、日志、Cookie 或模型文件。
 - 需要真实数据测试时，使用环境变量指向本地数据，不要复制数据文件。
+- API 默认只绑定本机；启用 `API_TOKEN` 后再允许客户端调用。
+- 不要把 `OLLAMA_HOST` 指向不受信任的远程服务，问题和检索片段可能被发送出去。
+- 查询日志默认关闭；开启 `QUERY_LOGGING_ENABLED` 前确认本地日志目录的访问权限。

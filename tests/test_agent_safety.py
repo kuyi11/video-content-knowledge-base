@@ -38,6 +38,7 @@ class FakeEngine:
 
 
 def test_answer_gate_blocks_pending_term_without_calling_llm(tmp_path, monkeypatch):
+    monkeypatch.setattr(agent, "QUERY_LOGGING_ENABLED", True)
     checklist = tmp_path / "review.md"
     checklist.write_text(
         "## 消化系统\n- `〔疑似转写错误：胃尿保护剂〕`：需要回听。\n",
@@ -72,6 +73,7 @@ def test_context_uses_exact_chunk_id_without_numbered_fragment_label():
 
 
 def test_answer_log_records_validated_claims(tmp_path, monkeypatch):
+    monkeypatch.setattr(agent, "QUERY_LOGGING_ENABLED", True)
     checklist = tmp_path / "review.md"
     checklist.write_text("# no pending terms\n", encoding="utf-8")
     monkeypatch.setattr(agent, "TERMINOLOGY_REVIEW_PATH", checklist)

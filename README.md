@@ -219,8 +219,12 @@ print(agent.generate_script(engine, "DSD患儿家长的心理建设"))
 
 ```powershell
 uv sync --extra api --extra test --no-python-downloads
-uv run --no-sync uvicorn api:app --host 0.0.0.0 --port 8000
+uv run --no-sync uvicorn api:app --host 127.0.0.1 --port 8000
 ```
+
+本地部署建议绑定 `127.0.0.1`。Docker Compose 默认也只发布到本机；如设置
+`API_TOKEN`，请求必须携带 `Authorization: Bearer <token>`。查询日志默认关闭，
+如确实需要本地审计可设置 `QUERY_LOGGING_ENABLED=true`，但日志可能包含问题和检索片段。
 
 查询示例：
 

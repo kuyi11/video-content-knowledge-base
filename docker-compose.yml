@@ -2,12 +2,13 @@ services:
   rag-api:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     environment:
       BGE_MODEL_PATH: /models/bge-m3
       OLLAMA_HOST: http://host.docker.internal:11434
       OBSIDIAN_EXTERNAL_VAULTS: /vault/external
       INDEX_DIR: /data/index
+      API_TOKEN: ${API_TOKEN:-}
     volumes:
       - ${BGE_MODEL_HOST_PATH:-./models/bge-m3}:/models/bge-m3:ro
       - ${OBSIDIAN_HOST_PATH:-./local-data/vault}:/vault/external:ro

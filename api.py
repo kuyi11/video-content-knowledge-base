@@ -9,10 +9,10 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from config import BGE_MODEL_PATH, INDEX_DIR
+from config import API_TOKEN, BGE_MODEL_PATH, INDEX_DIR, PROJECT_ROOT
 from modules import agent
 from modules.embedding_runtime import SentenceTransformer
 from modules.indexer import HybridIndex
@@ -73,8 +73,24 @@ service = RagService()
 app = FastAPI(title="Video Content Knowledge Base", version="0.1.0")
 
 
+def _check_api_token(authorization: str | None) -> None:
+    if API_TOKEN and authorization != f"Bearer {API_TOKEN}":
+        raise HTTPException(status_code=401, detail="invalid or missing API token")
+
+
+def _public_source_path(value: str) -> str:
+    if not value:
+        return ""
+    try:
+        path = __import__("pathlib").Path(value).resolve()
+        return path.relative_to(PROJECT_ROOT.resolve()).as_posix()
+    except (ValueError, OSError):
+        return "private-source"
+
+
 @app.get("/health")
-def health() -> dict:
+def health(authorization: str | None = Header(default=None)) -> dict:
+    _check_api_token(authorization)
     report = service.health()
     if report.get("service") != "ready":
         raise HTTPException(status_code=503, detail=report)
@@ -82,7 +98,8 @@ def health() -> dict:
 
 
 @app.post("/query")
-def query(request: QueryRequest) -> dict:
+def query(request: QueryRequest, authorization: str | None = Header(default=None)) -> dict:
+    _check_api_token(authorization)
     try:
         answer, usage = agent.answer_question_with_usage(
             service.engine(),
@@ -105,7 +122,7 @@ def query(request: QueryRequest) -> dict:
         {
             "chunk_id": item.get("chunk_id"),
             "source_refs": item.get("source_refs", []),
-            "source_path": item.get("source_path", ""),
+            "source_path": _public_source_path(item.get("source_path", "")),
             "video_id": item.get("video_id", ""),
             "start": item.get("start"),
             "end": item.get("end"),
@@ -119,5 +136,5 @@ def query(request: QueryRequest) -> dict:
         "claim_grounding": grounding,
         "safety_gate": usage.get("safety_gate"),
         "retrieval": retrieval,
-        "query_log_path": usage.get("retrieval_log_path"),
+        "query_log_path": None,
     }
