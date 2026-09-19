@@ -1,0 +1,22 @@
+version: nutrition-asr-2026-07
+entries:
+  - canonical: 肌糖原
+    aliases: [鸡糖原, 鸡汤圆, 鸡糖圆, 积碳员, 积碳圆, 肌糖缘, 肌糖元, 肌痰缘, 肌汤缘]
+    hotword_weight: 20
+    context: [碳水, 训练, 补糖]
+  - canonical: 肝糖原
+    aliases: [干糖原]
+    hotword_weight: 20
+    context: [血糖, 肝脏, 碳水]
+  - canonical: 胰岛素敏感性
+    aliases: [胰岛素敏感型]
+    hotword_weight: 18
+    context: [血糖, 代谢]
+  - canonical: 基础代谢率
+    aliases: [基础代谢律]
+    hotword_weight: 18
+    context: [能量消耗, 减脂]
+  - canonical: 膳食纤维
+    aliases: [膳食先维]
+    hotword_weight: 16
+    context: [饮食, 肠道]

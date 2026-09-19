@@ -1,0 +1,35 @@
+[project]
+name = "video-content-knowledge-base"
+version = "0.1.0"
+description = "视频内容知识库 — 视频URL → 结构化知识 → RAG 问答"
+requires-python = ">=3.12"
+dependencies = [
+    "yt-dlp>=2024.0.0",
+    "faster-whisper>=1.0.0",
+    "ffmpeg-python>=0.2.0",
+    "sentence-transformers>=5.6.0",
+    "faiss-cpu>=1.14.3",
+    "whoosh>=2.7.4",
+    "jieba>=0.42.1",
+    "ollama>=0.4.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+api = ["fastapi>=0.115.0", "uvicorn[standard]>=0.34.0"]
+
+[tool.setuptools.packages.find]
+include = ["modules*", "modules.*"]
+namespaces = false
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["temp", ".venv", "index", "vault", "prompts"]
+
+[build-system]
+requires = ["setuptools>=83.0.0"]
+build-backend = "setuptools.build_meta"

@@ -1,0 +1,111 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "title": { "type": "string" },
+    "summary": { "type": "string" },
+    "topics": { "type": "array", "items": { "type": "string" } },
+    "key_points": { "type": "array", "items": { "type": "string" } },
+    "insights": { "type": "array", "items": { "type": "string" } },
+    "knowledge_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "definition": { "type": "string" },
+          "explanation": { "type": "string" },
+          "application": { "type": "string" },
+          "limitations": { "type": "string" },
+          "importance": { "type": "string" },
+          "confidence": { "type": "string" },
+          "source_refs": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["name", "definition", "explanation", "application", "limitations", "importance", "confidence"]
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question": { "type": "string" },
+          "question_type": { "type": "string" },
+          "answer": { "type": "string" },
+          "quality": { "type": "string" },
+          "quality_score": { "type": "integer" },
+          "quality_reason": { "type": "string" },
+          "unresolved": { "type": "string" },
+          "source_refs": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["question", "question_type", "answer", "quality", "quality_score", "quality_reason", "unresolved"]
+      }
+    },
+    "pros_cons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subject": { "type": "string" },
+          "pros": { "type": "array", "items": { "type": "string" } },
+          "cons": { "type": "array", "items": { "type": "string" } },
+          "best_for": { "type": "string" },
+          "not_for": { "type": "string" },
+          "tradeoff": { "type": "string" },
+          "source_refs": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["subject", "pros", "cons", "best_for", "not_for", "tradeoff"]
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "claim": { "type": "string" },
+          "evidence_type": { "type": "string" },
+          "evidence": { "type": "string" },
+          "confidence": { "type": "string" },
+          "counterpoint": { "type": "string" },
+          "source_refs": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["claim", "evidence_type", "evidence", "confidence", "counterpoint"]
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "risk": { "type": "string" },
+          "impact": { "type": "string" },
+          "mitigation": { "type": "string" },
+          "confidence": { "type": "string" },
+          "source_refs": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["risk", "impact", "mitigation", "confidence"]
+      }
+    },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": [
+    "title",
+    "summary",
+    "topics",
+    "key_points",
+    "insights",
+    "knowledge_items",
+    "questions",
+    "pros_cons",
+    "evidence",
+    "risks",
+    "actions",
+    "tags"
+  ]
+}

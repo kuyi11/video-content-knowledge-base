@@ -1,0 +1,14 @@
+.git
+.venv
+.venv-funasr-test
+.uv-cache
+.u
+.pytest_cache
+index
+temp
+vault
+eval/reports
+__pycache__
+*.egg-info
+*.py[cod]
+*.log

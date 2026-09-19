@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "title": { "type": "string" },
+    "summary": { "type": "string" },
+    "topics": { "type": "array", "items": { "type": "string" } },
+    "key_points": { "type": "array", "items": { "type": "string" } },
+    "insights": { "type": "array", "items": { "type": "string" } },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["title", "summary", "topics", "key_points", "insights", "actions", "tags"]
+}

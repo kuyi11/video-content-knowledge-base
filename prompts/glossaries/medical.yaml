@@ -1,0 +1,25 @@
+version: medical-asr-2026-07
+entries:
+  - canonical: 心包积液
+    variants:
+      - 心包基业
+    candidate: 心包积液
+    hotword_weight: 20
+    context: [心包, 超声, 积液]
+    note: 医学语境中的同音转写候选，必须结合上下文确认
+  - canonical: 嗜酸性粒细胞升高
+    variants:
+      - 视酸膏
+      - 失酸膏
+      - 失脏膏
+    candidate: 嗜酸高（嗜酸性粒细胞升高）
+    hotword_weight: 18
+    context: [血常规, 过敏, 嗜酸性粒细胞]
+    note: 仅作为同音候选，不代表已经明确病因或诊断
+  - canonical: 病理活检
+    variants:
+      - 病例核检
+    candidate: 病理活检
+    hotword_weight: 20
+    context: [组织, 送检, 病理]
+    note: 取组织送检语境中的候选术语，必须结合上下文确认

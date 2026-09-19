@@ -1,0 +1,29 @@
+version: query-rewrite-v1
+rules:
+  - id: brain_infarction
+    aliases: [脑梗, 中风]
+    expansions: [脑卒中, 缺血性脑卒中]
+  - id: myocardial_infarction
+    aliases: [心梗]
+    expansions: [心肌梗死]
+  - id: tinea_pedis
+    aliases: [脚气]
+    expansions: [足癣]
+  - id: shingles
+    aliases: [带状疱疹]
+    expansions: [水痘-带状疱疹病毒]
+  - id: resistance_training
+    aliases: [抗阻力训练]
+    expansions: [抗阻训练]
+  - id: coenzyme_q10
+    aliases: [维生素Q10, Q10]
+    expansions: [辅酶Q10]
+  - id: carbohydrate_supplement
+    aliases: [补糖]
+    expansions: [补充碳水化合物, 碳水补给]
+  - id: gastroesophageal_reflux
+    aliases: [胃酸倒流]
+    expansions: [胃食管反流, 反酸]
+  - id: sexually_transmitted_infection
+    aliases: [性病]
+    expansions: [性传播感染, STI]

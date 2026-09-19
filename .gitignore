@@ -1,0 +1,62 @@
+# === Python ===
+.venv/
+.uv-cache/
+.u/
+.venv-funasr-test/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# === 临时文件（音频下载、转录中间产物） ===
+temp/
+
+# === 索引（可重建的二进制文件） ===
+index/vector/
+index/keyword/
+index/pipeline_state.json
+index/.tmp_vector/
+index/.tmp_keyword/
+index/.bak_vector/
+index/.bak_keyword/
+index/.bak_vector*/
+index/.bak_keyword*/
+index/.swap_journal.*
+index/.pipeline_state.lock
+index/.index.lock
+index/index-health.json
+index/terminology-review.json
+index/query_logs/
+
+# === RAG evaluation outputs ===
+eval/reports/*.json
+eval/reports/*.md
+eval/reports/*.jsonl
+eval/reports/*.log
+!eval/reports/.gitkeep
+
+# === Cookie / 凭据 ===
+*_cookies.txt
+*.cookies
+
+# === Obsidian 工作区（用户本地配置） ===
+vault/.obsidian/
+
+# === Private/local knowledge data ===
+vault/
+eval/baselines/
+tools/cookies/
+local-data/
+models/
+
+# === 环境变量 ===
+.env
+
+# === IDE / OS ===
+.vscode/
+.idea/
+.playwright-browsers/
+Thumbs.db
+.DS_Store

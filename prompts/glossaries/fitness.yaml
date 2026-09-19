@@ -1,0 +1,22 @@
+version: fitness-asr-2026-07
+entries:
+  - canonical: 肌糖原
+    aliases: [鸡糖原, 鸡汤圆, 鸡糖圆, 积碳员, 积碳圆, 肌糖缘, 肌糖元, 肌痰缘, 肌汤缘]
+    hotword_weight: 20
+    context: [训练, 碳水, 补糖, 肝糖原]
+  - canonical: 渐进超负荷
+    aliases: [渐进超复合]
+    hotword_weight: 20
+    context: [力量训练, 增肌, 负重]
+  - canonical: 肌肥大
+    aliases: [肌肥代]
+    hotword_weight: 18
+    context: [增肌, 训练容量]
+  - canonical: 离心收缩
+    aliases: [离心伸缩]
+    hotword_weight: 16
+    context: [动作, 肌肉]
+  - canonical: 向心收缩
+    aliases: [向心伸缩]
+    hotword_weight: 16
+    context: [动作, 肌肉]
