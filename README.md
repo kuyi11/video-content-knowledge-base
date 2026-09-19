@@ -2,6 +2,9 @@
 
 视频内容知识库 — 将 B站视频 URL 自动转化为可搜索、可提问的结构化知识系统。
 
+> 使用 Codex 开发前请先阅读 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)。日常开发目录是
+> `VideoContentKnowledgeBase-public`；真实 vault、原始转录和完整历史保留在本地私有工作树中。
+
 ## 架构
 
 ```
