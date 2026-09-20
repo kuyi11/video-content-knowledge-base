@@ -147,3 +147,28 @@ class TestChunkSplitter:
 
         assert len(chunks) == 1
         assert chunks[0].source_refs == []
+
+    def test_structured_note_with_transcript_emits_separate_raw_evidence(self):
+        doc = Document(
+            video_id="BVmixed",
+            source_url="",
+            content="## Summary\n" + ("总结内容。" * 20) + "\n## Transcript\n原始正文",
+            document_id="BVmixed__medical",
+            profile="medical",
+            segments=[Segment(start=1.0, end=4.0, text="原始转录证据")],
+            chunk_type="structured_summary",
+            domain="medical",
+            quality="derived_pending_review",
+            answer_policy="summary_requires_raw_evidence",
+        )
+
+        chunks = ChunkSplitter(FakeModel()).split([doc])
+
+        summary = [chunk for chunk in chunks if chunk.chunk_type == "structured_summary"]
+        raw = [chunk for chunk in chunks if chunk.chunk_type == "raw_transcript"]
+        assert len(summary) == 1
+        assert "原始正文" not in summary[0].content
+        assert len(raw) == 1
+        assert raw[0].source_of_truth is True
+        assert raw[0].source_refs == ["S0001"]
+        assert raw[0].document_id == "BVmixed__medical__raw"

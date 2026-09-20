@@ -66,6 +66,7 @@ def test_loader_recurses_and_supports_external_obsidian_frontmatter_and_transcri
 
     assert doc is not None
     assert doc.source_url.endswith(f"/{video_id}/")
+    assert doc.domain == "medical"
     assert [segment.start for segment in doc.segments] == [0.0, 12.0]
     assert doc.segments[0].end == 12.0
     assert doc.segments[1].text == "第二段内容"
@@ -111,3 +112,57 @@ def test_loader_excludes_vault_operations_documents(tmp_path):
     documents = VaultLoader(tmp_path, TranscriptModel()).load_all()
 
     assert [doc.video_id for doc in documents] == ["BVincluded"]
+
+
+def test_external_vault_does_not_read_global_temp_transcript(tmp_path, monkeypatch):
+    import modules.vault_loader as vault_loader
+
+    video_id = "BVexternaltemp"
+    note_dir = tmp_path / "external" / "unprocessed"
+    note_dir.mkdir(parents=True)
+    note = note_dir / "note.md"
+    note.write_text(
+        _note(video_id, "default", "## Transcript\n\n无时间轴正文"),
+        encoding="utf-8",
+    )
+    temp_dir = tmp_path / "temp"
+    temp_dir.mkdir()
+    (temp_dir / f"{video_id}_norm.txt").write_text(
+        "[0s -> 2s] 不应读取", encoding="utf-8"
+    )
+    monkeypatch.setattr(vault_loader, "TEMP_DIR", temp_dir)
+
+    doc = VaultLoader(note_dir.parent, TranscriptModel()).load_one(video_id)
+    assert doc is not None
+    assert doc.segments == []
+
+
+def test_transcript_changes_are_reflected_in_content_hash(tmp_path):
+    video_id = "BVhashtranscript"
+    note = tmp_path / f"{video_id}.md"
+    note.write_text(_note(video_id, "default", "summary"), encoding="utf-8")
+    temp_dir = tmp_path / "temp"
+    temp_dir.mkdir()
+    transcript = temp_dir / f"{video_id}_norm.txt"
+    transcript.write_text("[0s -> 2s] first", encoding="utf-8")
+
+    loader = VaultLoader(tmp_path, TranscriptModel(), temp_dir=temp_dir)
+    first = loader.load_one(video_id)
+    transcript.write_text("[0s -> 2s] second", encoding="utf-8")
+    second = loader.load_one(video_id)
+
+    assert first is not None and second is not None
+    assert first.content_hash != second.content_hash
+
+
+def test_structured_summary_defaults_to_raw_evidence_policy(tmp_path):
+    video_id = "BVsummarypolicy"
+    note = tmp_path / "videos" / f"{video_id}__default.md"
+    note.parent.mkdir()
+    note.write_text(_note(video_id, "default", "summary"), encoding="utf-8")
+
+    doc = VaultLoader(tmp_path, TranscriptModel()).load_one(video_id)
+
+    assert doc is not None
+    assert doc.chunk_type == "structured_summary"
+    assert doc.answer_policy == "summary_requires_raw_evidence"

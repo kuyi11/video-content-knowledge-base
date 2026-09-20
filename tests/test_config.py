@@ -34,3 +34,9 @@ def test_summary_profile_config_supports_multiple_and_deduplicates():
 
 def test_summary_profile_config_falls_back_to_default():
     assert config._parse_summary_profiles(" , ") == ("default",)
+
+
+def test_local_llm_hosts_do_not_require_remote_opt_in():
+    assert config._is_local_llm_host("http://localhost:11434")
+    assert config._is_local_llm_host("http://host.docker.internal:11434")
+    assert not config._is_local_llm_host("https://llm.example.com")

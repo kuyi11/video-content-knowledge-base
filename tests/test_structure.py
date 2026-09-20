@@ -334,6 +334,9 @@ class TestValidateStructureSchema:
         assert "schema_version: v2" in md
         assert "id: BVdetail__detailed" in md
         assert "video_id: BVdetail" in md
+        assert "summary_status: draft" in md
+        assert "allowed_for_high_risk_answer: false" in md
+        assert "answer_policy: summary_requires_raw_evidence" in md
         assert "## 具体知识点" in md
         assert "## 问题分析" in md
         assert "## 优缺点分析" in md

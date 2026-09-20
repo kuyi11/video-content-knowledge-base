@@ -205,3 +205,34 @@ def test_embedded_track_respects_allow_any_language(monkeypatch):
     )
 
     assert subtitle_module._embedded_track(Path("video.mkv"), ("zh", "en")) is None
+
+
+def test_embedded_transcript_cache_invalidates_when_media_changes(tmp_path, monkeypatch):
+    monkeypatch.setattr(subtitle_module, "TEMP_DIR", tmp_path / "temp")
+    media = tmp_path / "video.mkv"
+    media.write_bytes(b"first")
+    extract_calls = []
+
+    monkeypatch.setattr(
+        subtitle_module,
+        "_embedded_track",
+        lambda path, languages: {"index": 2, "language": "en"},
+    )
+
+    def fake_run(command, **kwargs):
+        extract_calls.append(command)
+        Path(command[-1]).write_text(
+            "1\n00:00:00,000 --> 00:00:01,000\ncaption\n",
+            encoding="utf-8",
+        )
+        return type("Result", (), {"returncode": 0, "stdout": ""})()
+
+    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+
+    first = subtitle_module.get_embedded_transcript(media, "BVembedded")
+    second = subtitle_module.get_embedded_transcript(media, "BVembedded")
+    media.write_bytes(b"second-media")
+    third = subtitle_module.get_embedded_transcript(media, "BVembedded")
+
+    assert first is not None and second is not None and third is not None
+    assert len(extract_calls) == 2

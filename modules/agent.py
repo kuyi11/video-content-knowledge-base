@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import time
 import uuid
@@ -6,15 +7,32 @@ from pathlib import Path
 
 import ollama
 
-from config import INDEX_DIR, LLM_CONFIG, QUERY_LOGGING_ENABLED, TERMINOLOGY_REVIEW_PATH
+from config import (
+    CLAIM_EVIDENCE_AUDIT_ENABLED,
+    INDEX_DIR,
+    LLM_CONFIG,
+    QUERY_LOGGING_ENABLED,
+    SEMANTIC_GROUNDING_MAX_CLAIMS,
+    TERMINOLOGY_REVIEW_PATH,
+)
 from modules.claim_judge import ClaimJudge, OllamaClaimJudge
 from modules.claim_grounding import is_abstention_answer, not_applicable, validate_claims
+from modules.evidence_audit import SCHEMA_VERSION, build_evidence_audit, persist_evidence_audit
 from modules.medical_safety import evaluate_medical_safety, load_review_rules
 from modules.query_engine import QueryEngine
+from modules.query_planner import detect_evidence_conflicts, evaluate_subquery_coverage
 
-_ollama_client = ollama.Client(host=LLM_CONFIG["host"])
+_ollama_client = ollama.Client(
+    host=LLM_CONFIG["host"], timeout=LLM_CONFIG["timeout_seconds"]
+)
+logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_CHARS = 2800
+OUTPUT_GATE_BLOCK_MESSAGE = (
+    "当前回答中的结论未通过证据准入校验，无法生成可靠结论。"
+    "请核对原始来源或转人工复核。"
+)
+OUTPUT_GATE_REDACTION_NOTICE = "（部分未通过证据准入校验的内容已省略。）"
 
 SYSTEM_QA = """你是一个基于视频知识库的问答助手。
 规则：
@@ -106,6 +124,222 @@ def _handle_empty(result: dict) -> str | None:
     return None
 
 
+def _answer_confidence(
+    result: dict,
+    grounding: dict,
+    safety: dict | None,
+    conflicts: dict | None = None,
+    output_gate: dict | None = None,
+) -> dict:
+    """Expose calibrated answer confidence without treating LLM scores as truth."""
+    safety_action = (
+        safety.get("action")
+        if isinstance(safety, dict)
+        else getattr(safety, "action", None)
+    )
+    if safety_action == "block":
+        return {"level": "low", "reasons": ["safety_gate_blocked"]}
+    if output_gate and output_gate.get("action") in {"block", "redact"}:
+        return {
+            "level": "low",
+            "reasons": [f"output_gate_{output_gate['action']}ed"],
+        }
+    if conflicts and conflicts.get("status") == "conflict":
+        return {"level": "low", "reasons": ["conflicting_retrieved_evidence"]}
+    if result.get("status") != "ok" or not result.get("results"):
+        return {"level": "low", "reasons": ["insufficient_retrieval_evidence"]}
+    reasons = []
+    citation_rate = grounding.get("claim_citation_grounding_rate")
+    if citation_rate is not None and citation_rate < 1:
+        reasons.append("claims_not_fully_cited")
+    semantic_rate = grounding.get("claim_semantic_grounding_rate")
+    if semantic_rate is not None and semantic_rate < 1:
+        reasons.append("claims_not_fully_semantically_supported")
+    if safety_action == "warn":
+        reasons.append("safety_gate_warning")
+    if conflicts and conflicts.get("status") == "uncertain":
+        reasons.append("evidence_conflict_check_uncertain")
+    if not grounding.get("claims") and grounding.get("status") != "not_applicable":
+        reasons.append("no_verifiable_claims")
+    if reasons:
+        return {"level": "medium", "reasons": reasons}
+    return {"level": "high", "reasons": ["retrieved_evidence_and_claims_validated"]}
+
+
+def _not_applicable_output_gate(reason: str) -> dict:
+    return {
+        "action": "not_applicable",
+        "reason": reason,
+        "claim_count": 0,
+        "allowed_claim_count": 0,
+        "blocked_claim_count": 0,
+        "allowed_cited_chunk_ids": [],
+        "allowed_cited_source_refs": [],
+        "blocked_claims": [],
+    }
+
+
+def _capture_evidence_audit(
+    question: str,
+    answer: str,
+    grounding: dict,
+    output_gate: dict,
+) -> dict:
+    generation = str(grounding.get("index_generation_id", ""))
+    summary = {
+        "schema_version": SCHEMA_VERSION,
+        "audit_id": None,
+        "index_generation_id": generation,
+        "persisted": False,
+        "record_path": None,
+    }
+    if grounding.get("status") != "ok" or not grounding.get("claims"):
+        summary["reason"] = grounding.get("reason", "no_claims")
+        return summary
+    if not CLAIM_EVIDENCE_AUDIT_ENABLED:
+        summary["reason"] = "persistence_disabled"
+        return summary
+
+    record = build_evidence_audit(
+        question=question,
+        answer=answer,
+        grounding=grounding,
+        output_gate=output_gate,
+        index_generation_id=generation,
+    )
+    summary["audit_id"] = record["audit_id"]
+    try:
+        path = persist_evidence_audit(record, INDEX_DIR)
+    except OSError:
+        logger.exception("failed to persist claim/evidence audit %s", record["audit_id"])
+        summary["reason"] = "write_failed"
+        return summary
+    summary.update({"persisted": True, "record_path": str(path), "reason": "persisted"})
+    return summary
+
+
+def _claim_block_reasons(claim: dict, evidence_by_id: dict[str, dict]) -> list[str]:
+    reasons = []
+    if not claim.get("valid"):
+        reasons.extend(claim.get("errors") or ["invalid_citation"])
+    verdict = claim.get("semantic_verdict")
+    if verdict not in {None, "not_evaluated", "supported"}:
+        reasons.append(f"semantic_{verdict}")
+    cited_units = [
+        evidence_by_id[evidence_id]
+        for evidence_id in claim.get("evidence_unit_ids", [])
+        if evidence_id in evidence_by_id
+    ]
+    if any(
+        unit.get("answer_policy") == "summary_requires_raw_evidence"
+        or unit.get("retrieval_role") == "derived_summary"
+        for unit in cited_units
+    ):
+        reasons.append("derived_summary_not_admitted")
+    if not reasons:
+        reasons.append("evidence_not_admitted")
+    return list(dict.fromkeys(reasons))
+
+
+def _apply_output_gate(answer: str, grounding: dict) -> tuple[str, dict]:
+    """Remove generated claims that failed citation, semantic, or provenance admission."""
+    if grounding.get("status") == "not_applicable":
+        return answer, _not_applicable_output_gate(grounding.get("reason", "not_applicable"))
+
+    claims = list(grounding.get("claims") or [])
+    evidence_by_id = {
+        unit.get("evidence_id"): unit
+        for unit in grounding.get("evidence_units") or []
+        if unit.get("evidence_id")
+    }
+    blocked = [claim for claim in claims if not claim.get("allowed_for_answer", False)]
+    allowed = [claim for claim in claims if claim.get("allowed_for_answer", False)]
+    allowed_citations = [
+        citation
+        for claim in allowed
+        for citation in claim.get("citations", [])
+        if citation.get("valid")
+    ]
+    report = {
+        "action": "allow",
+        "reason": "all_claims_admitted",
+        "claim_count": len(claims),
+        "allowed_claim_count": len(claims) - len(blocked),
+        "blocked_claim_count": len(blocked),
+        "allowed_cited_chunk_ids": sorted(
+            {citation["chunk_id"] for citation in allowed_citations}
+        ),
+        "allowed_cited_source_refs": sorted(
+            {
+                source_ref
+                for citation in allowed_citations
+                for source_ref in citation.get("source_refs", [])
+            }
+        ),
+        "blocked_claims": [
+            {
+                "claim_id": claim.get("claim_id"),
+                "line": claim.get("line"),
+                "reasons": _claim_block_reasons(claim, evidence_by_id),
+            }
+            for claim in blocked
+        ],
+    }
+    if not claims or len(blocked) == len(claims):
+        report["action"] = "block"
+        report["reason"] = "no_admitted_claims"
+        return OUTPUT_GATE_BLOCK_MESSAGE, report
+    if not blocked:
+        return answer, report
+
+    blocked_lines = {
+        claim.get("line") for claim in blocked if isinstance(claim.get("line"), int)
+    }
+    retained_lines = [
+        line
+        for line_no, line in enumerate(answer.splitlines(), start=1)
+        if line_no not in blocked_lines
+    ]
+    redacted = "\n".join(retained_lines).strip()
+    if not redacted:
+        report["action"] = "block"
+        report["reason"] = "no_admitted_claims"
+        return OUTPUT_GATE_BLOCK_MESSAGE, report
+    report["action"] = "redact"
+    report["reason"] = "unadmitted_claims_removed"
+    return f"{redacted}\n{OUTPUT_GATE_REDACTION_NOTICE}", report
+
+
+def _evidence_coverage(result: dict, *, semantic_grounding: bool) -> dict:
+    meta = result.get("meta", {})
+    sub_queries = list(meta.get("sub_queries") or [])
+    baseline = list(meta.get("coverage") or [])
+    if not sub_queries:
+        return {"status": "not_applicable", "sub_queries": [], "used_llm": False}
+    if semantic_grounding and isinstance(meta.get("semantic_coverage"), dict):
+        return meta["semantic_coverage"]
+    if not semantic_grounding or len(sub_queries) < 2:
+        statuses = [item.get("status") for item in baseline]
+        status = "covered" if statuses and all(value == "covered" for value in statuses) else "partial"
+        return {"status": status, "sub_queries": baseline, "used_llm": False}
+    return evaluate_subquery_coverage(
+        sub_queries,
+        result.get("results", []),
+        client=_ollama_client,
+        model=LLM_CONFIG["model"],
+    )
+
+
+def _evidence_conflicts(result: dict, *, semantic_grounding: bool) -> dict:
+    if not semantic_grounding:
+        return {"status": "disabled", "conflicts": [], "used_llm": False}
+    return detect_evidence_conflicts(
+        result.get("results", []),
+        client=_ollama_client,
+        model=LLM_CONFIG["model"],
+    )
+
+
 def _ask(messages: list, temp: float) -> str:
     answer, _ = ask_with_usage(messages, temp)
     return answer
@@ -143,13 +377,39 @@ def answer_question_with_usage(
         query_kwargs["filters"] = filters
     if rewrite is not None:
         query_kwargs["rewrite"] = rewrite
+    if semantic_grounding and isinstance(engine, QueryEngine):
+        query_kwargs["semantic_grounding"] = True
     result = engine.query(question, **query_kwargs)
+    evidence_coverage = _evidence_coverage(result, semantic_grounding=semantic_grounding)
+    evidence_conflicts = _evidence_conflicts(result, semantic_grounding=semantic_grounding)
+    index_generation_id = str(result.get("meta", {}).get("index_generation_id", ""))
     if empty := _handle_empty(result):
-        grounding = not_applicable("retrieval_empty")
-        log_path = _maybe_write_query_log(
-            question, result, empty, {}, safety=None, grounding=grounding
+        grounding = not_applicable(
+            "retrieval_empty", index_generation_id=index_generation_id
         )
-        usage = {"retrieval_log_path": str(log_path) if log_path else None, "claim_grounding": grounding}
+        output_gate = _not_applicable_output_gate("retrieval_empty")
+        evidence_audit = _capture_evidence_audit(question, empty, grounding, output_gate)
+        log_path = _maybe_write_query_log(
+            question,
+            result,
+            empty,
+            {},
+            safety=None,
+            grounding=grounding,
+            output_gate=output_gate,
+            evidence_audit=evidence_audit,
+        )
+        usage = {
+            "retrieval_log_path": str(log_path) if log_path else None,
+            "claim_grounding": grounding,
+            "output_gate": output_gate,
+            "evidence_audit": evidence_audit,
+            "answer_confidence": _answer_confidence(
+                result, grounding, None, evidence_conflicts, output_gate
+            ),
+            "evidence_coverage": evidence_coverage,
+            "evidence_conflicts": evidence_conflicts,
+        }
         if include_retrieval:
             usage["retrieval"] = result
         return empty, usage
@@ -166,14 +426,32 @@ def answer_question_with_usage(
             f"{detail}，当前证据不足以生成确定性医疗结论。"
             "请回看原视频并由专业人员复核。"
         )
-        grounding = not_applicable("medical_safety_block")
+        grounding = not_applicable(
+            "medical_safety_block", index_generation_id=index_generation_id
+        )
+        output_gate = _not_applicable_output_gate("medical_safety_block")
+        evidence_audit = _capture_evidence_audit(question, answer, grounding, output_gate)
         log_path = _maybe_write_query_log(
-            question, result, answer, {}, safety=safety.to_dict(), grounding=grounding
+            question,
+            result,
+            answer,
+            {},
+            safety=safety.to_dict(),
+            grounding=grounding,
+            output_gate=output_gate,
+            evidence_audit=evidence_audit,
         )
         usage = {
             "retrieval_log_path": str(log_path) if log_path else None,
             "safety_gate": safety.to_dict(),
             "claim_grounding": grounding,
+            "output_gate": output_gate,
+            "evidence_audit": evidence_audit,
+            "answer_confidence": _answer_confidence(
+                result, grounding, safety, evidence_conflicts, output_gate
+            ),
+            "evidence_coverage": evidence_coverage,
+            "evidence_conflicts": evidence_conflicts,
         }
         if include_retrieval:
             usage["retrieval"] = result
@@ -193,7 +471,9 @@ def answer_question_with_usage(
         0.3,
     )
     if is_abstention_answer(answer):
-        grounding = not_applicable("model_abstention")
+        grounding = not_applicable(
+            "model_abstention", index_generation_id=index_generation_id
+        )
     else:
         semantic_grounding = semantic_grounding or semantic_judge is not None
         if semantic_grounding and semantic_judge is None:
@@ -202,14 +482,34 @@ def answer_question_with_usage(
             answer,
             result["results"],
             semantic_judge=semantic_judge if semantic_grounding else None,
+            semantic_max_claims=(
+                SEMANTIC_GROUNDING_MAX_CLAIMS if semantic_grounding else None
+            ),
+            index_generation_id=index_generation_id,
         )
+    answer, output_gate = _apply_output_gate(answer, grounding)
+    evidence_audit = _capture_evidence_audit(question, answer, grounding, output_gate)
     log_path = _maybe_write_query_log(
-        question, result, answer, usage, safety=safety.to_dict(), grounding=grounding
+        question,
+        result,
+        answer,
+        usage,
+        safety=safety.to_dict(),
+        grounding=grounding,
+        output_gate=output_gate,
+        evidence_audit=evidence_audit,
     )
     usage = dict(usage)
     usage["retrieval_log_path"] = str(log_path) if log_path else None
     usage["safety_gate"] = safety.to_dict()
     usage["claim_grounding"] = grounding
+    usage["output_gate"] = output_gate
+    usage["evidence_audit"] = evidence_audit
+    usage["answer_confidence"] = _answer_confidence(
+        result, grounding, safety, evidence_conflicts, output_gate
+    )
+    usage["evidence_coverage"] = evidence_coverage
+    usage["evidence_conflicts"] = evidence_conflicts
     if include_retrieval:
         usage["retrieval"] = result
     return answer, usage
@@ -229,6 +529,8 @@ def _write_query_log(
     *,
     safety: dict | None,
     grounding: dict,
+    output_gate: dict,
+    evidence_audit: dict,
 ) -> Path:
     log_dir = INDEX_DIR / "query_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -242,9 +544,11 @@ def _write_query_log(
         "applied_rewrite_rules": result.get("meta", {}).get("applied_rewrite_rules", []),
         "metadata_filters": result.get("meta", {}).get("filters", {}),
         "retrieval": result,
-        "used_chunk_ids": grounding["valid_cited_chunk_ids"],
-        "used_source_refs": grounding["valid_cited_source_refs"],
+        "used_chunk_ids": output_gate["allowed_cited_chunk_ids"],
+        "used_source_refs": output_gate["allowed_cited_source_refs"],
         "claim_grounding": grounding,
+        "output_gate": output_gate,
+        "evidence_audit": evidence_audit,
         "answer": answer,
         "answer_model": LLM_CONFIG["model"],
         "prompt_version": (

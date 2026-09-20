@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import EXTERNAL_VAULT_PATHS, INDEX_DIR, VAULT_DIR
+from config import EXTERNAL_VAULT_PATHS, INDEX_DIR, TEMP_DIR, VAULT_DIR
 from modules.indexer import HybridIndex
 from modules.vault_loader import VaultLoader
 
@@ -35,7 +35,9 @@ def main() -> int:
     args = parser.parse_args()
     vaults = tuple(args.vault) or (VAULT_DIR, *EXTERNAL_VAULT_PATHS)
     model = InventoryModel()
-    documents = VaultLoader(vaults, model, embed_segments=False).load_all()
+    documents = VaultLoader(
+        vaults, model, embed_segments=False, temp_dir=TEMP_DIR
+    ).load_all()
     index = HybridIndex(args.index_dir, model=model, load_index=False)
     report = index.write_health_report(documents)
     print(json.dumps(report, ensure_ascii=False, indent=2))

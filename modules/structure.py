@@ -32,7 +32,9 @@ from modules.transcript_parser import format_time
 
 logger = logging.getLogger(__name__)
 MODEL = LLM_CONFIG["model"]
-_ollama_client = ollama.Client(host=LLM_CONFIG["host"])
+_ollama_client = ollama.Client(
+    host=LLM_CONFIG["host"], timeout=LLM_CONFIG["timeout_seconds"]
+)
 
 # Backward-compatible alias used by older code/tests.
 JSON_SCHEMA = load_structure_schema(DEFAULT_SCHEMA_VERSION)
@@ -1211,6 +1213,16 @@ def render_markdown(
         "profile": profile,
         "schema_version": schema_version,
         "tags": data["tags"],
+        # Derived summaries are useful for navigation and retrieval, but raw
+        # source evidence is required before high-risk answer generation.
+        "summary_status": "draft",
+        "allowed_for": ["navigation", "retrieval"],
+        "requires_raw_evidence": True,
+        "allowed_for_high_risk_answer": False,
+        "source_of_truth": False,
+        "review_status": "pending",
+        "quality": "derived_pending_review",
+        "answer_policy": "summary_requires_raw_evidence",
     }
     if prompt_version:
         frontmatter["prompt_version"] = prompt_version

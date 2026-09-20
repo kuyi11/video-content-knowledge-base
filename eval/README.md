@@ -29,7 +29,10 @@ uv run --no-sync python eval/run_eval.py --with-generation
 ```
 
 Reports are timestamped under `eval/reports/` and ignored by Git. Retrieval
-metrics are exact and deterministic against the labels. `heuristic_grounded_answer_rate`
+metrics are exact and deterministic against the labels. Reports include Hit Rate@K,
+Precision@K, MRR, novelty-aware nDCG@K, and source coverage. nDCG only rewards the
+first Chunk that covers each reviewed `video_id + source_ref`, so duplicate retrieval
+cannot inflate ranking quality. `heuristic_grounded_answer_rate`
 is intentionally conservative: it requires every answer point to occur in the
 output and every cited video to have been retrieved. It is a regression signal,
 not a replacement for clinical expert review or an entailment judge.

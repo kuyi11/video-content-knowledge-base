@@ -29,6 +29,8 @@ index/.index.lock
 index/index-health.json
 index/terminology-review.json
 index/query_logs/
+index/claim_evidence/
+index/evidence-audit-health.json
 
 # === RAG evaluation outputs ===
 eval/reports/*.json

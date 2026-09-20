@@ -6,6 +6,7 @@ import re
 from collections.abc import Iterable
 
 from modules.claim_judge import ClaimJudge, ClaimJudgment, parse_judgment
+from modules.evidence_model import allowed_for_answer, build_evidence_units
 
 
 CITATION_RE = re.compile(r"\[\s*([A-Za-z0-9_-]+)\s*\|\s*([^\]]*)\]")
@@ -25,11 +26,12 @@ def is_abstention_answer(answer: str) -> bool:
     return bool(ABSTENTION_RE.match(normalized))
 
 
-def not_applicable(reason: str) -> dict:
+def not_applicable(reason: str, *, index_generation_id: str = "") -> dict:
     """Return a stable report for answers deliberately not generated from RAG."""
     return {
         "status": "not_applicable",
         "reason": reason,
+        "index_generation_id": index_generation_id,
         "claim_count": 0,
         "grounded_claim_count": 0,
         "invalid_claim_count": 0,
@@ -43,6 +45,7 @@ def not_applicable(reason: str) -> dict:
         "valid_cited_chunk_ids": [],
         "valid_cited_source_refs": [],
         "review_claims": [],
+        "evidence_units": [],
         "claims": [],
     }
 
@@ -52,6 +55,8 @@ def validate_claims(
     retrieved_results: Iterable[dict],
     *,
     semantic_judge: ClaimJudge | None = None,
+    semantic_max_claims: int | None = None,
+    index_generation_id: str = "",
 ) -> dict:
     """Validate every non-heading answer line as an independently cited claim.
 
@@ -60,13 +65,13 @@ def validate_claims(
     be listed on that exact chunk; ``N/A`` is valid only for a chunk with no
     source references.
     """
+    evidence_units = build_evidence_units(retrieved_results)
     evidence = {
-        str(item.get("chunk_id")): {
-            "source_refs": set(item.get("source_refs") or []),
-            "text": str(item.get("text", item.get("content", ""))),
+        chunk_id: {
+            "source_refs": set(unit.source_refs),
+            "text": unit.text,
         }
-        for item in retrieved_results
-        if item.get("chunk_id")
+        for chunk_id, unit in evidence_units.items()
     }
     claims = []
     valid_chunk_ids: set[str] = set()
@@ -119,6 +124,7 @@ def validate_claims(
             claim_errors.extend(citation_errors)
 
         claim = {
+            "claim_id": f"C{len(claims) + 1:04d}",
             "line": line_no,
             "claim": claim_text,
             "citations": citations,
@@ -130,9 +136,20 @@ def validate_claims(
             "semantic_evidence_chunk_ids": [],
             "semantic_error": None,
             "needs_review": False,
+            "evidence_unit_ids": [],
+            "support_status": "unverified",
+            "allowed_for_answer": False,
         }
         if semantic_judge is not None:
-            if claim_errors:
+            if semantic_max_claims is not None and len(claims) >= semantic_max_claims:
+                judgment = ClaimJudgment(
+                    "insufficient_evidence",
+                    "low",
+                    "已达到本次请求的语义裁判预算，需人工复核。",
+                    (),
+                )
+                claim["semantic_error"] = "semantic_claim_budget_exceeded"
+            elif claim_errors:
                 judgment = ClaimJudgment(
                     "insufficient_evidence",
                     "high",
@@ -176,6 +193,23 @@ def validate_claims(
                     or judgment.confidence != "high",
                 }
             )
+        cited_units = [
+            evidence_units[citation["chunk_id"]]
+            for citation in citations
+            if citation["valid"] and citation["chunk_id"] in evidence_units
+        ]
+        claim["evidence_unit_ids"] = [unit.evidence_id for unit in cited_units]
+        claim["support_status"] = (
+            claim["semantic_verdict"]
+            if semantic_judge is not None
+            else ("citation_validated" if claim["valid"] else "unsupported")
+        )
+        claim["allowed_for_answer"] = allowed_for_answer(
+            cited_units,
+            citations_valid=claim["valid"],
+            semantic_enabled=semantic_judge is not None,
+            semantic_verdict=claim["semantic_verdict"],
+        )
         claims.append(claim)
 
     grounded = sum(claim["valid"] for claim in claims)
@@ -189,6 +223,7 @@ def validate_claims(
     semantic_enabled = semantic_judge is not None
     return {
         "status": "ok",
+        "index_generation_id": index_generation_id,
         "claim_count": claim_count,
         "grounded_claim_count": grounded,
         "invalid_claim_count": claim_count - grounded,
@@ -206,5 +241,6 @@ def validate_claims(
         "valid_cited_chunk_ids": sorted(valid_chunk_ids),
         "valid_cited_source_refs": sorted(valid_source_refs),
         "review_claims": [claim for claim in claims if claim["needs_review"]],
+        "evidence_units": [unit.to_dict() for unit in evidence_units.values()],
         "claims": claims,
     }

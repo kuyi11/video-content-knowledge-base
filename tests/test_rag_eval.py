@@ -50,8 +50,35 @@ def test_retrieval_metrics_and_source_coverage():
     )
 
     assert report["summary"]["recall_at_k"] == 1.0
+    assert report["summary"]["hit_rate_at_k"] == 1.0
+    assert report["summary"]["precision_at_k"] == 0.2
+    assert report["summary"]["ndcg_at_k"] == pytest.approx(0.3869, abs=0.0001)
     assert report["summary"]["mrr"] == 0.5
     assert report["summary"]["source_coverage"] == 0.5
+
+
+def test_ndcg_does_not_reward_duplicate_coverage_of_same_source():
+    case = EvalCase(
+        id="dedup-ndcg",
+        question="question",
+        category="fact",
+        expected_video_ids=("BV1",),
+        expected_source_refs=("S0001", "S0002"),
+        expected_sources=(("BV1", "S0001"), ("BV1", "S0002")),
+        answer_points=(),
+        risk_level="low",
+        expected_answer=True,
+    )
+    results = [
+        _result(1, "BV1", "S0001"),
+        _result(2, "BV1", "S0001"),
+        _result(3, "BV1", "S0002"),
+    ]
+
+    report = evaluate_cases([case], lambda question, top_k: results, top_k=3)
+
+    assert report["cases"][0]["precision_at_k"] == 1.0
+    assert report["cases"][0]["ndcg_at_k"] < 1.0
 
 
 def test_generation_metrics_distinguish_abstention_and_grounding():

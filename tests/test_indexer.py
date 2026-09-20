@@ -458,6 +458,24 @@ class TestHybridIndex:
         assert reloaded._needs_build is True
         assert reloaded.faiss_index is None
 
+    def test_malformed_manifest_requires_rebuild(self, tmp_path):
+        from modules.vault_loader import Document
+
+        index_dir = tmp_path / "malformed-manifest-index"
+        document = Document(
+            video_id="BVmanifest",
+            source_url="http://example.com/BVmanifest",
+            content="## Topic\ncontent for manifest validation",
+        )
+        first = HybridIndex(index_dir, model=FakeModel())
+        first.build([document], force=True)
+        first._close_whoosh()
+        (index_dir / "vector" / "manifest.json").write_text("[]", encoding="utf-8")
+
+        reloaded = HybridIndex(index_dir, model=FakeModel())
+        assert reloaded._needs_build is True
+        assert reloaded.faiss_index is None
+
     def test_atomic_swap_rolls_back_on_keyword_failure(self, index, monkeypatch):
         from modules.vault_loader import Document
 

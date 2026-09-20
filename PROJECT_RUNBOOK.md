@@ -92,6 +92,23 @@ uv sync --python "D:\mambaProject\VideoContentKnowledgeBase\mamba_env\python.exe
 | `BGE_MODEL_PATH` | `D:/tool/bge-m3` | bge-m3 embedding 模型目录 |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama 服务地址 |
 | `OLLAMA_MODEL` | `qwen2.5:7b` | 结构化和 Agent 默认模型 |
+| `LLM_TIMEOUT_SECONDS` | `180` | Ollama 单次请求网络超时；语义检查失败时降级为人工复核 |
+| `RERANKER_MODEL_PATH` | 空 | 可选本地 Cross-Encoder 路径；为空时使用 RRF |
+| `RERANKER_CANDIDATE_K` | `20` | 启用重排时的候选数量 |
+| `RERANKER_DEVICE` | 自动 | Cross-Encoder 推理设备 |
+| `QUERY_PLANNER_ENABLED` | `false` | 是否对复杂问题启用受约束的 LLM 查询规划 |
+| `QUERY_PLANNER_MODEL` | `qwen2.5:7b` | 查询规划使用的本地 Ollama 模型 |
+| `QUERY_PLANNER_MAX_SUBQUERIES` | `3` | 查询规划最多拆分的子问题数 |
+| `QUERY_MULTI_HOP_ENABLED` | `false` | 是否对第一跳未覆盖的子问题启用受约束迭代检索 |
+| `QUERY_MULTI_HOP_MAX_HOPS` | `2` | 最大检索跳数，硬限制为 1-3 |
+| `SEMANTIC_GROUNDING_MAX_CLAIMS` | `8` | 单次请求最多使用语义裁判的 Claim 数，超出部分转人工复核 |
+| `QUERY_CACHE_ENABLED` | `true` | 是否启用有界内存查询缓存；索引 generation 变化时自动隔离 |
+| `CLAIM_EVIDENCE_AUDIT_ENABLED` | `false` | 是否持久化 Claim/Evidence、证据指纹与索引 generation；记录可能包含敏感内容 |
+| `QUERY_CACHE_SIZE` | `128` | 查询缓存最大条目数，设为 `0` 可关闭 |
+| `API_RATE_LIMIT_PER_MINUTE` | `60` | 单客户端每分钟最大查询请求数，设为 `0` 可关闭 |
+| `API_MAX_CONCURRENT_QUERIES` | `4` | API 同时执行的查询数上限 |
+| `LLM_INPUT_COST_PER_1K` | `0` | `/metrics` 的输入 token 估算单价，仅用于运营估算 |
+| `LLM_OUTPUT_COST_PER_1K` | `0` | `/metrics` 的输出 token 估算单价，仅用于运营估算 |
 | `WHISPER_DEVICE` | `auto` | 自动选择 CTranslate2 CUDA，无 CUDA 时回退 CPU |
 | `WHISPER_COMPUTE_TYPE` | `auto` | CUDA 使用 `float16`，CPU 使用 `int8` |
 | `WHISPER_LANGUAGE` | `auto` | ASR 自动识别语言；可显式设为 `zh`、`en` 等 |
@@ -175,7 +192,16 @@ uv run --no-sync python pipeline.py "url1" "url2" "url3"
 - FAISS 索引是否存在
 - Whoosh 索引目录是否存在
 - vector 和 keyword manifest 的 `generation_id`、`chunk_count` 是否一致
-- `chunks.pkl` 是否包含对应的 `video_id + profile` 文档身份
+- `chunks.json` 是否包含对应的 `video_id + profile` 文档身份
+- 派生总结命中时，检索结果中是否存在对应的 `retrieval_role=raw_backtrace` 原始证据
+- 多问题查询的 `retrieval.meta.coverage` 是否覆盖各个子问题
+- 多跳开启时，`retrieval.meta.hop_trace` 是否仅对 `missing`、`partial` 或 `unsupported` 的证据需求继续检索
+- 启用语义检查时，`evidence_coverage` 是否对每个子问题给出 `covered`、`partial` 或 `unsupported`
+- 启用语义检查时，`evidence_conflicts` 是否记录冲突证据及其 Chunk ID
+- `claim_grounding.claims` 是否通过 `evidence_unit_ids` 关联证据，且派生总结未被单独标记为 `allowed_for_answer`
+- `output_gate` 是否删除未获准 Claim，并确保响应引用与日志 `used_chunk_ids` 仅指向最终保留的 Claim
+- 开启 Claim/Evidence 审计时，记录的 `index_generation_id` 和 `evidence_fingerprint` 是否可用于检测历史证据失效
+- 审计生命周期扫描是否先以 preview 模式运行，确认 `invalidated`、`corrupt` 和 `expired` 数量后再显式 `--apply` 清理
 
 只有这些条件都满足，才会跳过。
 
@@ -344,7 +370,7 @@ Markdown frontmatter 使用 YAML 写入，包含：
 |---|---|---|
 | FAISS | `index/vector/faiss.index` | 语义向量召回 |
 | id map | `index/vector/id_map.json` | FAISS 数字 ID 到 chunk ID |
-| chunks | `index/vector/chunks.pkl` | chunk 元数据 |
+| chunks | `index/vector/chunks.json` | chunk 元数据 |
 | manifest | `index/vector/manifest.json` | vector 索引版本信息 |
 | Whoosh | `index/keyword/whoosh/` | BM25 / 关键词召回 |
 | manifest | `index/keyword/whoosh/manifest.json` | keyword 索引版本信息 |

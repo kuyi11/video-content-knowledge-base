@@ -47,18 +47,25 @@ class Document:
 
 
 class VaultLoader:
+    PATH_DOMAINS = frozenset({"medical", "wellness", "fitness", "course", "review"})
+
     def __init__(
         self,
         vault_path: Path | Iterable[Path],
         model: SentenceTransformer,
         *,
         embed_segments: bool = True,
+        temp_dir: Path | None = None,
     ):
         if isinstance(vault_path, (str, Path)):
             vault_path = [vault_path]
         self.vault_paths = tuple(Path(path) for path in vault_path)
+        self._primary_vault = self.vault_paths[0].resolve() if self.vault_paths else None
         self.model = model
         self.embed_segments = embed_segments
+        # A caller must opt into the shared transcript cache so external vaults
+        # cannot accidentally consume files belonging to another workspace.
+        self.temp_dir = Path(temp_dir) if temp_dir is not None else None
 
     def _markdown_files(self):
         for vault_path in self.vault_paths:
@@ -89,6 +96,7 @@ class VaultLoader:
         documents = []
         for md_file, doc in candidates.values():
             doc.segments = self._parse_transcript(doc)
+            self._refresh_content_hash(doc)
             if doc.segments and self.embed_segments:
                 doc._seg_embs = self.model.encode(
                     [s.text for s in doc.segments],
@@ -112,6 +120,7 @@ class VaultLoader:
 
         doc = selected[1]
         doc.segments = self._parse_transcript(doc)
+        self._refresh_content_hash(doc)
         if doc.segments and self.embed_segments:
             doc._seg_embs = self.model.encode(
                 [s.text for s in doc.segments],
@@ -181,6 +190,16 @@ class VaultLoader:
             quality = quality or "raw_unverified"
         elif chunk_type == "structured_summary":
             quality = "derived_pending_review" if quality in {"", "draft"} else quality
+        answer_policy = str(frontmatter.get("answer_policy", ""))
+        if chunk_type == "structured_summary" and not answer_policy:
+            answer_policy = "summary_requires_raw_evidence"
+        domain = str(frontmatter.get("domain", "")).strip().lower()
+        if not domain:
+            domain = next(
+                (part.casefold() for part in reversed(path.parts)
+                 if part.casefold() in self.PATH_DOMAINS),
+                "",
+            )
         return Document(
             video_id=video_id,
             source_url=source_url,
@@ -190,12 +209,12 @@ class VaultLoader:
             prompt_version=str(frontmatter.get("prompt_version", "")),
             source_path=str(path.resolve()),
             chunk_type=chunk_type,
-            domain=str(frontmatter.get("domain", "")),
+            domain=domain,
             quality=quality,
             review_status=review_status,
             source_of_truth=source_of_truth,
             risk_level=str(frontmatter.get("risk_level", "low")),
-            answer_policy=str(frontmatter.get("answer_policy", "")),
+            answer_policy=answer_policy,
             source_refs=[str(item) for item in source_refs],
             raw_source_path=str(frontmatter.get("raw_source_path", "")),
             content_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
@@ -203,22 +222,42 @@ class VaultLoader:
 
     def _parse_transcript(self, doc: Document) -> List[Segment]:
         video_id = extract_video_id(doc.source_url) or extract_video_id(doc.video_id)
-        if video_id:
+        is_primary = False
+        if self._primary_vault:
+            try:
+                Path(doc.source_path).resolve().relative_to(self._primary_vault)
+                is_primary = True
+            except ValueError:
+                pass
+        if video_id and is_primary and self.temp_dir is not None:
             exact_matches = [
-                TEMP_DIR / f"{video_id}_norm.txt",
-                TEMP_DIR / f"{video_id}__transcript.txt",
-                TEMP_DIR / f"{video_id}.txt",
+                self.temp_dir / f"{video_id}_norm.txt",
+                self.temp_dir / f"{video_id}__transcript.txt",
+                self.temp_dir / f"{video_id}.txt",
             ]
             matches = [p for p in exact_matches if p.exists()]
             if not matches:
                 matches = sorted(
-                    TEMP_DIR.glob(f"{video_id}*.txt"),
+                    self.temp_dir.glob(f"{video_id}*.txt"),
                     key=lambda p: p.stat().st_mtime,
                     reverse=True,
                 )
             if matches:
                 return self._parse_timestamped_text(matches[0].read_text(encoding="utf-8"))
         return self._parse_timestamped_text(doc.content, embedded=True)
+
+    @staticmethod
+    def _refresh_content_hash(doc: Document) -> None:
+        """Include parsed transcript content so index freshness tracks temp artifacts."""
+        if not doc.segments:
+            return
+        segment_text = "\n".join(
+            f"{segment.start:.6f}|{segment.end:.6f}|{segment.text}"
+            for segment in doc.segments
+        )
+        doc.content_hash = hashlib.sha256(
+            f"{doc.content}\n--segments--\n{segment_text}".encode("utf-8")
+        ).hexdigest()
 
     @staticmethod
     def _parse_timestamped_text(text: str, *, embedded: bool = False) -> List[Segment]:

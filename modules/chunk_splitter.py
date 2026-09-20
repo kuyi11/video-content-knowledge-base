@@ -66,6 +66,8 @@ class ChunkSplitter:
         sections = self._split_by_headings(doc.content)
         raw_chunks = []
         for section_title, section_text in sections:
+            if section_title.casefold() == "transcript":
+                continue
             if not section_text.strip():
                 continue
             body = section_text.strip()
@@ -114,6 +116,28 @@ class ChunkSplitter:
 
         for ch in final_chunks:
             self._align_time(ch, doc)
+
+        # Web-clipped notes may contain both a structured summary and a raw
+        # transcript. Keep the summary chunks for discovery and emit the
+        # transcript separately so provenance policy can admit primary evidence.
+        if doc.chunk_type == "structured_summary" and doc.segments:
+            raw_doc = Document(
+                video_id=doc.video_id,
+                source_url=doc.source_url,
+                content="",
+                profile=f"{doc.profile}_raw",
+                document_id=f"{doc.document_id}__raw",
+                segments=doc.segments,
+                source_path=doc.source_path,
+                chunk_type="raw_transcript",
+                domain=doc.domain,
+                quality="raw_unverified",
+                review_status=doc.review_status,
+                source_of_truth=True,
+                risk_level=doc.risk_level,
+                content_hash=doc.content_hash,
+            )
+            final_chunks.extend(self._split_raw_transcript(raw_doc))
 
         return final_chunks
 

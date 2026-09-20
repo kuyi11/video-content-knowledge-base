@@ -3,7 +3,6 @@ import gc
 import hashlib
 import logging
 import os
-import pickle
 import shutil
 import time
 from dataclasses import dataclass
@@ -99,11 +98,12 @@ class SearchResult:
 
 
 class HybridIndex:
-    INDEX_VERSION = 4
+    INDEX_VERSION = 5
     FILTER_FIELDS = frozenset({
         "video_id", "profile", "chunk_type", "domain", "quality",
         "review_status", "source_of_truth", "risk_level",
     })
+    MAX_FILTER_SCAN = 10000
 
     def __init__(self, index_dir: Path, model: SentenceTransformer, *, load_index: bool = True):
         self.index_dir = Path(index_dir)
@@ -128,7 +128,7 @@ class HybridIndex:
         kw_manifest_path = self.keyword_dir / "manifest.json"
         faiss_path = str(self.vector_dir / "faiss.index")
         id_map_path = self.vector_dir / "id_map.json"
-        chunks_path = self.vector_dir / "chunks.pkl"
+        chunks_path = self.vector_dir / "chunks.json"
 
         if not (
             Path(faiss_path).exists()
@@ -158,14 +158,18 @@ class HybridIndex:
             if vm.get("model_id") != self._model_id():
                 logger.warning("Embedding model changed, need rebuild")
                 return False
-        except (OSError, json.JSONDecodeError, KeyError):
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError):
             return False
 
         try:
             self.faiss_index = faiss.read_index(faiss_path)
             with id_map_path.open(encoding="utf-8") as id_map_file:
                 self.id_map = {int(k): v for k, v in json.load(id_map_file).items()}
-            self.chunks = {c.chunk_id: c for c in pickle.loads(chunks_path.read_bytes())}
+            payload = json.loads(chunks_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, list):
+                raise ValueError("chunks.json must contain a list")
+            restored = [self._chunk_from_dict(item) for item in payload]
+            self.chunks = {c.chunk_id: c for c in restored}
             expected_dim = self._model_dimension()
             if vm.get("embedding_dim") != self.faiss_index.d:
                 raise RuntimeError("FAISS dimension does not match manifest")
@@ -290,7 +294,7 @@ class HybridIndex:
                 path.exists()
                 for path in (
                     self.vector_dir / "faiss.index",
-                    self.vector_dir / "chunks.pkl",
+                    self.vector_dir / "chunks.json",
                     self.vector_dir / "id_map.json",
                     self.keyword_dir / "manifest.json",
                 )
@@ -317,10 +321,19 @@ class HybridIndex:
             report["metadata_errors"].append(f"invalid manifest: {exc}")
             report["status"] = "stale"
             return report
+        if not isinstance(manifest, dict) or not isinstance(keyword_manifest, dict):
+            report["metadata_errors"].append("manifest must be a JSON object")
+            report["status"] = "stale"
+            return report
+        inventory = manifest.get("source_inventory", [])
+        if not isinstance(inventory, list):
+            report["metadata_errors"].append("source inventory must be a list")
+            report["status"] = "stale"
+            return report
         indexed = {
             item.get("document_id"): item
-            for item in manifest.get("source_inventory", [])
-            if item.get("document_id")
+            for item in inventory
+            if isinstance(item, dict) and item.get("document_id")
         }
         report["indexed_chunk_count"] = int(manifest.get("chunk_count", 0))
         report["indexed_document_count"] = len(indexed)
@@ -339,16 +352,17 @@ class HybridIndex:
         if not manifest.get("source_inventory"):
             report["metadata_errors"].append("missing source inventory")
         current = {}
-        for doc in documents or []:
-            current[doc.document_id] = {
-                "document_id": doc.document_id,
-                "source_path": doc.source_path,
-                "content_hash": doc.content_hash,
-                "chunk_type": doc.chunk_type,
-                "domain": doc.domain,
-                "quality": doc.quality,
-                "review_status": doc.review_status,
-                "source_of_truth": doc.source_of_truth,
+        expected_chunks = ChunkSplitter(self.model).split(documents or [])
+        for chunk in expected_chunks:
+            current[chunk.document_id] = {
+                "document_id": chunk.document_id,
+                "source_path": chunk.source_path,
+                "content_hash": chunk.content_hash,
+                "chunk_type": chunk.chunk_type,
+                "domain": chunk.domain,
+                "quality": chunk.quality,
+                "review_status": chunk.review_status,
+                "source_of_truth": chunk.source_of_truth,
             }
         if documents is not None:
             report["missing_from_index"] = sorted(set(current) - set(indexed))
@@ -563,12 +577,72 @@ class HybridIndex:
         faiss.write_index(faiss_index, str(vector_dir / "faiss.index"))
         with (vector_dir / "id_map.json").open("w", encoding="utf-8") as f:
             json.dump({str(k): v for k, v in sorted(id_map.items())}, f, ensure_ascii=False, indent=2)
-        (vector_dir / "chunks.pkl").write_bytes(pickle.dumps(chunks))
+        (vector_dir / "chunks.json").write_text(
+            json.dumps([self._chunk_to_dict(chunk) for chunk in chunks], ensure_ascii=False),
+            encoding="utf-8",
+        )
         manifest = self._manifest(chunks, faiss_index.d, generation_id=generation_id)
         manifest["vector_count"] = int(faiss_index.ntotal)
         manifest["id_map_count"] = len(id_map)
         manifest["index_type"] = type(faiss_index).__name__
         (vector_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _chunk_to_dict(chunk: Chunk) -> dict:
+        return {
+            "chunk_id": chunk.chunk_id,
+            "video_id": chunk.video_id,
+            "source_url": chunk.source_url,
+            "content": chunk.content,
+            "section": chunk.section,
+            "start": chunk.start,
+            "end": chunk.end,
+            "has_timestamp": chunk.has_timestamp,
+            "document_id": chunk.document_id,
+            "profile": chunk.profile,
+            "source_path": chunk.source_path,
+            "chunk_type": chunk.chunk_type,
+            "domain": chunk.domain,
+            "quality": chunk.quality,
+            "review_status": chunk.review_status,
+            "source_of_truth": chunk.source_of_truth,
+            "risk_level": chunk.risk_level,
+            "answer_policy": chunk.answer_policy,
+            "source_refs": list(chunk.source_refs or []),
+            "raw_source_path": chunk.raw_source_path,
+            "content_hash": chunk.content_hash,
+        }
+
+    @staticmethod
+    def _chunk_from_dict(payload: dict) -> Chunk:
+        if not isinstance(payload, dict):
+            raise ValueError("chunk entry must be an object")
+        required = {"chunk_id", "video_id", "content", "section"}
+        if not required.issubset(payload):
+            raise ValueError("chunk entry is missing required fields")
+        return Chunk(
+            chunk_id=str(payload["chunk_id"]),
+            video_id=str(payload["video_id"]),
+            source_url=str(payload.get("source_url", "")),
+            content=str(payload["content"]),
+            section=str(payload["section"]),
+            start=float(payload.get("start", 0.0)),
+            end=float(payload.get("end", 0.0)),
+            has_timestamp=bool(payload.get("has_timestamp", True)),
+            document_id=str(payload.get("document_id", "")),
+            profile=str(payload.get("profile", "default")),
+            source_path=str(payload.get("source_path", "")),
+            chunk_type=str(payload.get("chunk_type", "document")),
+            domain=str(payload.get("domain", "")),
+            quality=str(payload.get("quality", "")),
+            review_status=str(payload.get("review_status", "")),
+            source_of_truth=payload.get("source_of_truth"),
+            risk_level=str(payload.get("risk_level", "low")),
+            answer_policy=str(payload.get("answer_policy", "")),
+            source_refs=[str(item) for item in payload.get("source_refs", [])],
+            raw_source_path=str(payload.get("raw_source_path", "")),
+            content_hash=str(payload.get("content_hash", "")),
+        )
 
     def _write_full_keyword_store(
         self,
@@ -815,6 +889,11 @@ class HybridIndex:
             raise RuntimeError("Index not built. Call build() first.")
 
         self._validate_filters(filters)
+        if filters and len(self.chunks) > self.MAX_FILTER_SCAN:
+            raise ValueError(
+                f"filtered query exceeds maximum scan size ({self.MAX_FILTER_SCAN}); "
+                "build a metadata-specific index or narrow the corpus"
+            )
         candidate_k = len(self.chunks) if filters else max(12, top_k * 4)
         vec_hits = self._query_vector(q_emb, top_k=candidate_k)
         kw_hits = self._query_keyword(text, top_k=candidate_k)

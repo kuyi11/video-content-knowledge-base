@@ -61,6 +61,27 @@ def test_high_risk_question_requires_raw_or_reviewed_evidence():
     assert "lacks raw or human-reviewed evidence" in decision.reasons[0]
 
 
+def test_high_risk_question_rejects_summary_marked_as_raw_evidence_required():
+    decision = evaluate_medical_safety(
+        "这个药应该用多少剂量？",
+        [
+            {
+                "text": "人工整理的总结",
+                "domain": "medical",
+                "risk_level": "high",
+                "chunk_type": "structured_summary",
+                "quality": "human_reviewed",
+                "source_of_truth": False,
+                "answer_policy": "summary_requires_raw_evidence",
+            }
+        ],
+        [],
+    )
+
+    assert decision.action == "block"
+    assert "requires raw evidence" in decision.reasons[0]
+
+
 def test_unreviewed_raw_medical_evidence_is_allowed_with_warning():
     decision = evaluate_medical_safety(
         "胸痛应该如何处理？",

@@ -3,7 +3,6 @@ import hashlib
 import json
 import logging
 import os
-import pickle
 import sys
 import torch
 from pathlib import Path
@@ -69,7 +68,7 @@ class Pipeline:
 
     def _load_vault_documents(self, model):
         paths = (self.vault_path, *self.external_vault_paths)
-        return VaultLoader(paths, model).load_all()
+        return VaultLoader(paths, model, temp_dir=TEMP_DIR).load_all()
 
     def __enter__(self):
         return self
@@ -377,13 +376,13 @@ class Pipeline:
             documents = [
                 document
                 for prompt_profile in profiles
-                if (document := VaultLoader((self.vault_path, *self.external_vault_paths), model).load_one(video_id, prompt_profile.name))
+                if (document := VaultLoader((self.vault_path, *self.external_vault_paths), model, temp_dir=TEMP_DIR).load_one(video_id, prompt_profile.name))
             ]
             if documents:
                 index.add_documents(documents)
                 index.write_health_report(all_documents)
             else:
-                docs = VaultLoader(self.vault_path, model).load_all()
+                docs = VaultLoader(self.vault_path, model, temp_dir=TEMP_DIR).load_all()
                 index.build(docs, force=True)
         chunk_count = len(index.chunks)
         logger.info("[Step 5] Indexed: %d chunks", chunk_count)
@@ -562,7 +561,7 @@ class Pipeline:
                 whoosh_exists = (self.index_dir / "keyword" / "whoosh").exists()
                 vector_manifest = self.index_dir / "vector" / "manifest.json"
                 keyword_manifest = self.index_dir / "keyword" / "whoosh" / "manifest.json"
-                chunks_path = self.index_dir / "vector" / "chunks.pkl"
+                chunks_path = self.index_dir / "vector" / "chunks.json"
                 manifests_match = False
                 if vector_manifest.exists() and keyword_manifest.exists():
                     try:
@@ -578,12 +577,12 @@ class Pipeline:
                 document_id = make_document_id(video_id, profile.name)
                 if chunks_path.exists():
                     try:
-                        chunks = pickle.loads(chunks_path.read_bytes())
+                        chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
                         contains_document = any(
-                            getattr(c, "document_id", "") == document_id
+                            str(c.get("document_id", "")) == document_id
                             for c in chunks
                         )
-                    except (OSError, pickle.PickleError, EOFError):
+                    except (OSError, json.JSONDecodeError, TypeError, AttributeError):
                         contains_document = False
                 if not (faiss_exists and whoosh_exists and manifests_match and contains_document):
                     logger.warning(

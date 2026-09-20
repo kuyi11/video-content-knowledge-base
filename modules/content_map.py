@@ -44,7 +44,9 @@ CONTENT_MAP_PROMPT_VERSION = "content-map-2026-07-coverage3"
 CONTENT_MAP_SCHEMA_PATH = PROMPT_DIR / "schemas" / "content-map-v1.json"
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
-_ollama_client = ollama.Client(host=LLM_CONFIG["host"])
+_ollama_client = ollama.Client(
+    host=LLM_CONFIG["host"], timeout=LLM_CONFIG["timeout_seconds"]
+)
 
 MAP_SYSTEM_PROMPT = """你是视频转写事实提取器。你只提取当前窗口明确表达的内容，不做最终总结。
 规则：

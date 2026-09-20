@@ -466,6 +466,16 @@ def _embedded_track(media_path: Path, preferred_languages: tuple[str, ...]) -> d
     return {**selected, "language": language}
 
 
+def _media_fingerprint(media_path: Path) -> dict[str, str | int]:
+    """Return a cheap identity for cache validation without hashing large media files."""
+    stat = media_path.stat()
+    return {
+        "media_path": str(media_path.resolve()),
+        "media_size": stat.st_size,
+        "media_mtime_ns": stat.st_mtime_ns,
+    }
+
+
 def get_embedded_transcript(
     media_path: str | Path | None,
     video_id: str,
@@ -479,12 +489,23 @@ def get_embedded_transcript(
     media = Path(media_path)
     if not media.exists():
         return None
+    try:
+        media_fingerprint = _media_fingerprint(media)
+    except OSError:
+        return None
     output_path = TEMP_DIR / f"{video_id}_norm.txt"
     if not force and output_path.exists():
         metadata_path = output_path.with_suffix(".meta.json")
         try:
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            if metadata.get("text_source") == "subtitle_embedded":
+            cached_fingerprint = {
+                key: metadata.get(key)
+                for key in ("media_path", "media_size", "media_mtime_ns")
+            }
+            if (
+                metadata.get("text_source") == "subtitle_embedded"
+                and cached_fingerprint == media_fingerprint
+            ):
                 return TranscriptArtifact(
                     path=output_path,
                     text_source="subtitle_embedded",
@@ -522,11 +543,11 @@ def get_embedded_transcript(
         metadata = artifact.metadata()
         metadata.update({
             "video_id": video_id,
-            "media_path": str(media),
             "raw_subtitle_path": str(raw_path),
             "raw_subtitle_sha256": hashlib.sha256(raw_text.encode("utf-8")).hexdigest(),
             "preferred_languages": list(preferred_languages),
         })
+        metadata.update(media_fingerprint)
         _write_canonical_transcript(output_path, parse_subtitle_text(raw_text), metadata)
         return artifact
     except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError) as exc:

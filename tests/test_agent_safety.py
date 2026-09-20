@@ -33,7 +33,11 @@ class FakeEngine:
                     "source_refs": ["S0001"],
                 }
             ],
-            "meta": {"top_k": top_k, "result_count": 1},
+            "meta": {
+                "top_k": top_k,
+                "result_count": 1,
+                "index_generation_id": "generation-test",
+            },
         }
 
 
@@ -101,6 +105,7 @@ def test_answer_log_records_validated_claims(tmp_path, monkeypatch):
 
     assert usage["claim_grounding"]["claim_citation_grounding_rate"] == 1.0
     assert usage["claim_grounding"]["claim_semantic_grounding_rate"] == 1.0
+    assert usage["answer_confidence"]["level"] == "medium"
     log_path = Path(usage["retrieval_log_path"])
     log = json.loads(log_path.read_text(encoding="utf-8"))
     assert log["used_chunk_ids"] == ["BVmedical_raw_1"]
@@ -122,3 +127,143 @@ def test_model_abstention_is_excluded_from_claim_grounding(tmp_path, monkeypatch
 
     assert usage["claim_grounding"]["status"] == "not_applicable"
     assert usage["claim_grounding"]["reason"] == "model_abstention"
+    assert usage["output_gate"]["action"] == "not_applicable"
+
+
+def test_output_gate_removes_unadmitted_claim_but_keeps_admitted_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr(agent, "QUERY_LOGGING_ENABLED", True)
+    monkeypatch.setattr(agent, "INDEX_DIR", tmp_path / "index")
+    checklist = tmp_path / "review.md"
+    checklist.write_text("# no pending terms\n", encoding="utf-8")
+    monkeypatch.setattr(agent, "TERMINOLOGY_REVIEW_PATH", checklist)
+    monkeypatch.setattr(
+        agent,
+        "ask_with_usage",
+        lambda *args, **kwargs: (
+            "【结论】\n"
+            "1. 有证据的结论 [BVmedical_raw_1 | S0001]\n"
+            "2. 无证据的结论 [missing_chunk | S9999]",
+            {},
+        ),
+    )
+
+    answer, usage = agent.answer_question_with_usage(FakeEngine(), "视频讲了什么？")
+
+    assert "有证据的结论" in answer
+    assert "无证据的结论" not in answer
+    assert "已省略" in answer
+    assert usage["output_gate"]["action"] == "redact"
+    assert usage["output_gate"]["allowed_cited_chunk_ids"] == ["BVmedical_raw_1"]
+    assert usage["output_gate"]["blocked_claims"] == [
+        {
+            "claim_id": "C0002",
+            "line": 3,
+            "reasons": ["chunk_not_in_retrieval"],
+        }
+    ]
+    assert usage["answer_confidence"]["level"] == "low"
+    log = json.loads(Path(usage["retrieval_log_path"]).read_text(encoding="utf-8"))
+    assert log["answer"] == answer
+    assert log["used_chunk_ids"] == ["BVmedical_raw_1"]
+    assert log["output_gate"]["action"] == "redact"
+
+
+def test_claim_evidence_audit_can_be_persisted_independently_of_query_log(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(agent, "QUERY_LOGGING_ENABLED", False)
+    monkeypatch.setattr(agent, "CLAIM_EVIDENCE_AUDIT_ENABLED", True)
+    monkeypatch.setattr(agent, "INDEX_DIR", tmp_path / "index")
+    checklist = tmp_path / "review.md"
+    checklist.write_text("# no pending terms\n", encoding="utf-8")
+    monkeypatch.setattr(agent, "TERMINOLOGY_REVIEW_PATH", checklist)
+    monkeypatch.setattr(
+        agent,
+        "ask_with_usage",
+        lambda *args, **kwargs: ("结论 [BVmedical_raw_1 | S0001]", {}),
+    )
+
+    _, usage = agent.answer_question_with_usage(FakeEngine(), "视频讲了什么？")
+
+    audit = usage["evidence_audit"]
+    assert usage["retrieval_log_path"] is None
+    assert audit["persisted"] is True
+    assert audit["index_generation_id"] == "generation-test"
+    record = json.loads(Path(audit["record_path"]).read_text(encoding="utf-8"))
+    assert record["claims"][0]["claim_id"] == "C0001"
+    assert len(record["evidence_units"][0]["evidence_fingerprint"]) == 64
+
+
+def test_output_gate_blocks_answer_when_no_claim_is_admitted(tmp_path, monkeypatch):
+    checklist = tmp_path / "review.md"
+    checklist.write_text("# no pending terms\n", encoding="utf-8")
+    monkeypatch.setattr(agent, "TERMINOLOGY_REVIEW_PATH", checklist)
+    monkeypatch.setattr(
+        agent,
+        "ask_with_usage",
+        lambda *args, **kwargs: ("没有引用的结论", {}),
+    )
+
+    answer, usage = agent.answer_question_with_usage(FakeEngine(), "视频讲了什么？")
+
+    assert answer == agent.OUTPUT_GATE_BLOCK_MESSAGE
+    assert usage["output_gate"]["action"] == "block"
+    assert usage["output_gate"]["blocked_claims"][0]["reasons"] == [
+        "missing_citation"
+    ]
+    assert usage["output_gate"]["allowed_cited_chunk_ids"] == []
+
+
+def test_multi_query_coverage_is_checked_with_optional_semantic_judge(monkeypatch):
+    engine = FakeEngine()
+    original_query = engine.query
+
+    def multi_query(question, top_k=5):
+        result = original_query(question, top_k)
+        result["meta"]["sub_queries"] = ["问题一", "问题二"]
+        result["meta"]["coverage"] = [
+            {"query": "问题一", "status": "covered", "result_count": 1},
+            {"query": "问题二", "status": "covered", "result_count": 1},
+        ]
+        return result
+
+    engine.query = multi_query
+    calls = []
+
+    class Client:
+        def chat(self, **kwargs):
+            calls.append(kwargs)
+            return {"message": {"content": '{"status":"covered","confidence":"high","rationale":"证据覆盖问题。"}'}}
+
+    monkeypatch.setattr(agent, "_ollama_client", Client())
+    monkeypatch.setattr(agent, "ask_with_usage", lambda *args, **kwargs: ("不知道。", {}))
+
+    _, usage = agent.answer_question_with_usage(
+        engine, "问题一和问题二", semantic_grounding=True
+    )
+
+    assert usage["evidence_coverage"]["status"] == "covered"
+    assert len(calls) == 2
+
+
+def test_conflicting_evidence_lowers_answer_confidence(monkeypatch):
+    class Client:
+        def chat(self, **kwargs):
+            return {"message": {"content": '{"status":"conflict","conflicts":[{"chunk_ids":["a","b"],"rationale":"结论相反"}]}'}}
+
+    monkeypatch.setattr(agent, "_ollama_client", Client())
+    monkeypatch.setattr(agent, "ask_with_usage", lambda *args, **kwargs: ("不知道。", {}))
+    engine = FakeEngine()
+    original_query = engine.query
+
+    def conflicting_query(question, top_k=5):
+        result = original_query(question, top_k)
+        result["results"].append({**result["results"][0], "chunk_id": "b", "text": "相反证据"})
+        result["results"][0]["chunk_id"] = "a"
+        return result
+
+    engine.query = conflicting_query
+    _, usage = agent.answer_question_with_usage(engine, "问题", semantic_grounding=True)
+
+    assert usage["evidence_conflicts"]["status"] == "conflict"
+    assert usage["answer_confidence"]["level"] == "low"

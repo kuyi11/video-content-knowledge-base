@@ -141,6 +141,17 @@ def evaluate_medical_safety(
 
     has_reviewed = any(result.get("quality") == "human_reviewed" for result in results)
     has_raw_evidence = any(result.get("chunk_type") == "raw_transcript" for result in results)
+    has_summary_only = any(
+        result.get("answer_policy") == "summary_requires_raw_evidence"
+        and not result.get("source_of_truth", False)
+        for result in results
+    )
+    if high_risk and has_summary_only and not has_raw_evidence:
+        return SafetyDecision(
+            action="block",
+            risk_level="high",
+            reasons=("derived summary requires raw evidence for high-risk answers",),
+        )
     if high_risk and not (has_reviewed or has_raw_evidence):
         return SafetyDecision(
             action="block",

@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
+from urllib.parse import urlparse
 
 # === 路径配置 ===
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -189,10 +190,36 @@ EMBEDDING_BATCH_SIZE = int(os.environ.get("EMBEDDING_BATCH_SIZE", "32"))
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", os.environ.get("LLM_BASE_URL", "http://localhost:11434"))
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", os.environ.get("LLM_MODEL", "qwen2.5:7b"))
 QUERY_LOGGING_ENABLED = os.environ.get("QUERY_LOGGING_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+CLAIM_EVIDENCE_AUDIT_ENABLED = os.environ.get(
+    "CLAIM_EVIDENCE_AUDIT_ENABLED", "false"
+).strip().lower() in {"1", "true", "yes", "on"}
+CLAIM_EVIDENCE_RETENTION_DAYS = max(
+    0, int(os.environ.get("CLAIM_EVIDENCE_RETENTION_DAYS", "0"))
+)
 API_TOKEN = os.environ.get("API_TOKEN", "").strip()
+ALLOW_REMOTE_LLM = os.environ.get("ALLOW_REMOTE_LLM", "false").strip().lower() in {"1", "true", "yes", "on"}
 LLM_NUM_CTX = int(os.environ.get("LLM_NUM_CTX", "16384"))
 LLM_NUM_PREDICT = int(os.environ.get("LLM_NUM_PREDICT", "4096"))
 LLM_KEEP_ALIVE = os.environ.get("LLM_KEEP_ALIVE", "15m")
+LLM_TIMEOUT_SECONDS = max(1.0, float(os.environ.get("LLM_TIMEOUT_SECONDS", "180")))
+RERANKER_MODEL_PATH = os.environ.get("RERANKER_MODEL_PATH", "").strip()
+RERANKER_CANDIDATE_K = max(5, int(os.environ.get("RERANKER_CANDIDATE_K", "20")))
+RERANKER_DEVICE = os.environ.get("RERANKER_DEVICE", "").strip() or None
+QUERY_PLANNER_ENABLED = os.environ.get("QUERY_PLANNER_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+QUERY_PLANNER_MODEL = os.environ.get("QUERY_PLANNER_MODEL", OLLAMA_MODEL)
+QUERY_PLANNER_MAX_SUBQUERIES = max(1, min(5, int(os.environ.get("QUERY_PLANNER_MAX_SUBQUERIES", "3"))))
+QUERY_MULTI_HOP_ENABLED = os.environ.get("QUERY_MULTI_HOP_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+QUERY_MULTI_HOP_MAX_HOPS = max(1, min(3, int(os.environ.get("QUERY_MULTI_HOP_MAX_HOPS", "2"))))
+SEMANTIC_GROUNDING_MAX_CLAIMS = max(0, int(os.environ.get("SEMANTIC_GROUNDING_MAX_CLAIMS", "8")))
+QUERY_CACHE_ENABLED = os.environ.get("QUERY_CACHE_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+QUERY_CACHE_SIZE = max(0, int(os.environ.get("QUERY_CACHE_SIZE", "128")))
+API_RATE_LIMIT_PER_MINUTE = max(0, int(os.environ.get("API_RATE_LIMIT_PER_MINUTE", "60")))
+API_MAX_CONCURRENT_QUERIES = max(1, int(os.environ.get("API_MAX_CONCURRENT_QUERIES", "4")))
+# Optional accounting rates used for operational estimates only. Ollama does not
+# expose provider billing, so these are disabled by default and never represent
+# an invoice amount.
+LLM_INPUT_COST_PER_1K = max(0.0, float(os.environ.get("LLM_INPUT_COST_PER_1K", "0")))
+LLM_OUTPUT_COST_PER_1K = max(0.0, float(os.environ.get("LLM_OUTPUT_COST_PER_1K", "0")))
 LLM_MAP_TEMPERATURE = float(os.environ.get("LLM_MAP_TEMPERATURE", "0.1"))
 LLM_DIRECT_MAX_CHARS = int(os.environ.get("LLM_DIRECT_MAX_CHARS", "10000"))
 LLM_WINDOW_SECONDS = int(os.environ.get("LLM_WINDOW_SECONDS", "240"))
@@ -214,16 +241,30 @@ def _parse_summary_profiles(value: str) -> tuple[str, ...]:
 
 
 SUMMARY_PROFILES = _parse_summary_profiles(os.environ.get("SUMMARY_PROFILES", "default"))
+def _is_local_llm_host(host: str) -> bool:
+    """Allow loopback endpoints and Docker's host gateway without opt-in."""
+    parsed = urlparse(host)
+    return parsed.hostname in {"localhost", "127.0.0.1", "::1", "host.docker.internal"}
+
+
+if OLLAMA_HOST and not ALLOW_REMOTE_LLM and not _is_local_llm_host(OLLAMA_HOST):
+    raise ValueError(
+        "OLLAMA_HOST is not local. Set ALLOW_REMOTE_LLM=true only after confirming "
+        "that sending prompts and retrieved context to this endpoint is permitted."
+    )
+
+
 LLM_CONFIG = {
     "host": OLLAMA_HOST.rstrip("/"),
     "model": OLLAMA_MODEL,
     "num_ctx": LLM_NUM_CTX,
     "num_predict": LLM_NUM_PREDICT,
     "keep_alive": LLM_KEEP_ALIVE,
+    "timeout_seconds": LLM_TIMEOUT_SECONDS,
 }
 
-if OLLAMA_HOST and not OLLAMA_HOST.lower().startswith(("http://localhost", "http://127.0.0.1", "https://localhost", "https://127.0.0.1")):
-    logging.getLogger(__name__).warning("OLLAMA_HOST is remote; prompts and retrieved context may leave this machine: %s", OLLAMA_HOST)
+if OLLAMA_HOST and not _is_local_llm_host(OLLAMA_HOST):
+    logging.getLogger(__name__).warning("Remote OLLAMA_HOST explicitly enabled: %s", OLLAMA_HOST)
 
 # === Obsidian 配置 ===
 VAULT_VIDEOS_PATH = VAULT_DIR

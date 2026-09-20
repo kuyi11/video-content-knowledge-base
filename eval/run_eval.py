@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import statistics
 import sys
@@ -146,6 +147,32 @@ def _result_payload(result) -> dict:
 
 def _is_relevant(case: EvalCase, result) -> bool:
     return any((result.video_id, ref) in set(case.expected_sources) for ref in _refs(result.content))
+
+
+def _retrieval_quality(case: EvalCase, results: Sequence, top_k: int) -> dict:
+    """Compute precision and novelty-aware nDCG from reviewed source labels."""
+    expected = set(case.expected_sources)
+    if not case.expected_answer:
+        return {"precision_at_k": None, "ndcg_at_k": None}
+    relevant = sum(_is_relevant(case, result) for result in results[:top_k])
+    seen_sources: set[tuple[str, str]] = set()
+    gains = []
+    for result in results[:top_k]:
+        matched = {
+            (result.video_id, ref)
+            for ref in _refs(result.content)
+            if (result.video_id, ref) in expected
+        }
+        novel = matched - seen_sources
+        gains.append(1.0 if novel else 0.0)
+        seen_sources.update(matched)
+    dcg = sum(gain / math.log2(rank + 1) for rank, gain in enumerate(gains, start=1))
+    ideal_hits = min(len(expected), top_k)
+    idcg = sum(1.0 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1))
+    return {
+        "precision_at_k": relevant / top_k,
+        "ndcg_at_k": dcg / idcg if idcg else None,
+    }
 
 
 def _normalized(value: str) -> str:
@@ -295,6 +322,7 @@ def evaluate_cases(
             "hit_at_k": bool(relevant_ranks) if case.expected_answer else None,
             "first_relevant_rank": min(relevant_ranks) if relevant_ranks else None,
             "source_coverage": source_coverage,
+            **_retrieval_quality(case, results, top_k),
             "retrieval_latency_ms": round(retrieval_ms, 2),
             "rerank_latency_ms": round(rerank_ms, 2),
             "retrieved": [_result_payload(result) for result in results],
@@ -333,6 +361,9 @@ def evaluate_cases(
         "answerable_case_count": len(answerable),
         "unanswerable_case_count": len(unanswerable),
         "recall_at_k": _mean(row["hit_at_k"] for row in answerable),
+        "hit_rate_at_k": _mean(row["hit_at_k"] for row in answerable),
+        "precision_at_k": _mean(row["precision_at_k"] for row in answerable),
+        "ndcg_at_k": _mean(row["ndcg_at_k"] for row in answerable),
         "mrr": _mean(1 / row["first_relevant_rank"] if row["first_relevant_rank"] else 0 for row in answerable),
         "source_coverage": _mean(row["source_coverage"] for row in answerable),
         "avg_retrieval_latency_ms": _mean(retrieval_latencies),
@@ -395,6 +426,12 @@ def _by_category(details: Sequence[dict]) -> dict:
         category: {
             "case_count": len(rows),
             "recall_at_k": _mean(row["hit_at_k"] for row in rows if row["expected_answer"]),
+            "precision_at_k": _mean(
+                row["precision_at_k"] for row in rows if row["expected_answer"]
+            ),
+            "ndcg_at_k": _mean(
+                row["ndcg_at_k"] for row in rows if row["expected_answer"]
+            ),
             "mrr": _mean(
                 1 / row["first_relevant_rank"] if row["first_relevant_rank"] else 0
                 for row in rows if row["expected_answer"]
@@ -410,10 +447,11 @@ def _markdown_report(report: dict) -> str:
     lines = ["# RAG Evaluation Report", "", "## Summary", ""]
     for key, value in summary.items():
         lines.append(f"- `{key}`: {value}")
-    lines.extend(["", "## By Category", "", "| Category | Cases | Recall@k | MRR | Source coverage |", "| --- | ---: | ---: | ---: | ---: |"])
+    lines.extend(["", "## By Category", "", "| Category | Cases | Hit Rate@k | Precision@k | nDCG@k | MRR | Source coverage |", "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"])
     for category, metrics in report["by_category"].items():
         lines.append(
             f"| {category} | {metrics['case_count']} | {metrics['recall_at_k']} | "
+            f"{metrics['precision_at_k']} | {metrics['ndcg_at_k']} | "
             f"{metrics['mrr']} | {metrics['source_coverage']} |"
         )
     return "\n".join(lines) + "\n"

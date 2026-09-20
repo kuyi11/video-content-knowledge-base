@@ -29,7 +29,7 @@ git pull --ff-only origin main
 ```powershell
 $env:VAULT_DIR = "D:\agent project\total\VideoContentKnowledgeBase\vault\videos"
 $env:INDEX_DIR = "D:\agent project\total\VideoContentKnowledgeBase\index"
-$env:OBSIDIAN_EXTERNAL_VAULTS = "F:\obsidian"
+$env:OBSIDIAN_EXTERNAL_VAULTS = "F:\private-vault"
 ```
 
 不要把真实数据复制到公开工作树。`examples/sample_note.md` 是可提交的脱敏示例。
@@ -46,7 +46,7 @@ git ls-files vault tools/cookies eval/baselines
 最后一条命令应无输出。提交前还应检查本机路径、Cookie 和 Token：
 
 ```powershell
-git grep -n -I -i -E "F:\\obsidian|D:\\agent project|vd_source=|douyin_cookies|Network\.getAllCookies|encrypted_value|sk-[A-Za-z0-9]{10,}" -- ':!uv.lock'
+git grep -n -I -i -E "F:\\obsidian|D:\\agent project|vd_source=|douyin_cookies|Network\.getAllCookies|encrypted_value|sk-[A-Za-z0-9]{10,}" -- ':!uv.lock' ':!DEVELOPMENT_WORKFLOW.md'
 ```
 
 确认测试通过且没有敏感内容后：
@@ -63,6 +63,6 @@ git push origin public-main:main
 - 不要从原始目录向 `origin/main` 推送。
 - 不要提交真实字幕、医疗笔记、个人知识库、索引、日志、Cookie 或模型文件。
 - 需要真实数据测试时，使用环境变量指向本地数据，不要复制数据文件。
-- API 默认只绑定本机；启用 `API_TOKEN` 后再允许客户端调用。
-- 不要把 `OLLAMA_HOST` 指向不受信任的远程服务，问题和检索片段可能被发送出去。
+- API 默认只绑定本机；未设置令牌时仅允许回环客户端。Docker API 必须设置 `API_TOKEN`，且不会返回本机来源路径。
+- 不要把 `OLLAMA_HOST` 指向不受信任的远程服务。非本机端点必须显式设置 `ALLOW_REMOTE_LLM=true`，问题和检索片段可能被发送出去。
 - 查询日志默认关闭；开启 `QUERY_LOGGING_ENABLED` 前确认本地日志目录的访问权限。

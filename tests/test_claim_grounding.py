@@ -25,6 +25,11 @@ def test_claim_grounding_checks_chunk_and_source_ref_membership():
     assert report["valid_cited_chunk_ids"] == ["BVmedical_raw_1", "BVmedical_summary_1"]
     assert report["claims"][1]["errors"] == ["missing_citation"]
     assert report["claims"][2]["errors"] == ["chunk_not_in_retrieval"]
+    assert report["claims"][0]["claim_id"] == "C0001"
+    assert report["claims"][0]["evidence_unit_ids"] == ["E:BVmedical_raw_1"]
+    assert report["claims"][0]["support_status"] == "citation_validated"
+    assert report["claims"][0]["allowed_for_answer"] is True
+    assert report["evidence_units"][0]["chunk_id"] == "BVmedical_raw_1"
 
 
 def test_claim_grounding_rejects_ref_not_belonging_to_cited_chunk():
@@ -78,6 +83,25 @@ def test_semantic_judge_failure_degrades_to_review_instead_of_failing_answer():
     assert report["claims"][0]["needs_review"] is True
 
 
+def test_semantic_grounding_stops_at_per_request_claim_budget():
+    calls = []
+
+    def judge(claim, evidence):
+        calls.append(claim)
+        return ClaimJudgment("supported", "high", "证据直接支持。", ("BVmedical_raw_1",))
+
+    report = validate_claims(
+        "第一条 [BVmedical_raw_1 | S0001]\n第二条 [BVmedical_raw_1 | S0001]",
+        [{**RESULTS[0], "text": "原始证据"}],
+        semantic_judge=judge,
+        semantic_max_claims=1,
+    )
+
+    assert calls == ["第一条"]
+    assert report["claims"][1]["semantic_error"] == "semantic_claim_budget_exceeded"
+    assert report["claims"][1]["needs_review"] is True
+
+
 def test_heading_prefix_is_not_part_of_claim_and_abstention_is_detected():
     report = validate_claims(
         "【结论】内容 [BVmedical_raw_1 | S0001]",
@@ -99,3 +123,20 @@ def test_empty_source_ref_is_valid_for_chunk_without_source_refs():
 
     assert report["grounded_claim_count"] == 1
     assert report["claims"][0]["errors"] == []
+
+
+def test_derived_summary_is_not_admitted_as_answer_evidence():
+    report = validate_claims(
+        "摘要结论 [summary-1 | S0001]",
+        [{
+            "chunk_id": "summary-1",
+            "source_refs": ["S0001"],
+            "text": "摘要结论",
+            "chunk_type": "structured_summary",
+            "answer_policy": "summary_requires_raw_evidence",
+            "retrieval_role": "derived_summary",
+        }],
+    )
+
+    assert report["claims"][0]["valid"] is True
+    assert report["claims"][0]["allowed_for_answer"] is False

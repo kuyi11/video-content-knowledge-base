@@ -8,11 +8,14 @@ services:
       OLLAMA_HOST: http://host.docker.internal:11434
       OBSIDIAN_EXTERNAL_VAULTS: /vault/external
       INDEX_DIR: /data/index
-      API_TOKEN: ${API_TOKEN:-}
+      VAULT_DIR: /app/vault/videos
+      API_TOKEN: ${API_TOKEN:?Set API_TOKEN to a long random value before starting the API}
+      CLAIM_EVIDENCE_AUDIT_ENABLED: ${CLAIM_EVIDENCE_AUDIT_ENABLED:-false}
+      CLAIM_EVIDENCE_RETENTION_DAYS: ${CLAIM_EVIDENCE_RETENTION_DAYS:-0}
+      LLM_INPUT_COST_PER_1K: ${LLM_INPUT_COST_PER_1K:-0}
+      LLM_OUTPUT_COST_PER_1K: ${LLM_OUTPUT_COST_PER_1K:-0}
     volumes:
       - ${BGE_MODEL_HOST_PATH:-./models/bge-m3}:/models/bge-m3:ro
       - ${OBSIDIAN_HOST_PATH:-./local-data/vault}:/vault/external:ro
-      - ./index:/data/index
-      - ./vault:/app/vault
-      - ./temp:/app/temp
+      - ${INDEX_HOST_PATH:-./local-data/index}:/data/index
     restart: unless-stopped
