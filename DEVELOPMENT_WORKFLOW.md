@@ -2,7 +2,7 @@
 
 本仓库是 GitHub 公开开发版本。使用 Codex 开发时，应将当前目录作为唯一的日常开发目录：
 
-`D:\agent project\total\VideoContentKnowledgeBase-public`
+`<repo-root>`
 
 ## 两个本地目录的职责
 
@@ -15,7 +15,8 @@
 在 Codex 中打开 `VideoContentKnowledgeBase-public`，执行：
 
 ```powershell
-cd "D:\agent project\total\VideoContentKnowledgeBase-public"
+$repo = (Get-Location).Path
+Set-Location $repo
 git status --short --branch
 git pull --ff-only origin main
 ```
@@ -37,7 +38,7 @@ $env:OBSIDIAN_EXTERNAL_VAULTS = "F:\private-vault"
 ## 开发、测试与提交
 
 ```powershell
-& "D:\agent project\total\VideoContentKnowledgeBase\.venv\Scripts\python.exe" -m pytest -q
+python -m pytest -q
 git status --short
 git diff --check
 git ls-files vault tools/cookies eval/baselines
@@ -46,7 +47,7 @@ git ls-files vault tools/cookies eval/baselines
 最后一条命令应无输出。提交前还应检查本机路径、Cookie 和 Token：
 
 ```powershell
-git grep -n -I -i -E "F:\\obsidian|D:\\agent project|vd_source=|douyin_cookies|Network\.getAllCookies|encrypted_value|sk-[A-Za-z0-9]{10,}" -- ':!uv.lock' ':!DEVELOPMENT_WORKFLOW.md'
+git grep -n -I -i -E "F:\\obsidian|D:\\agent project|vd_source=|douyin_cookies|Network\.getAllCookies|encrypted_value|sk-[A-Za-z0-9]{10,}" -- ':!uv.lock'
 ```
 
 确认测试通过且没有敏感内容后：

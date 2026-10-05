@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 # === 路径配置 ===
 PROJECT_ROOT = Path(__file__).resolve().parent
-TEMP_DIR = PROJECT_ROOT / "temp"
+TEMP_DIR = Path(os.environ.get("TEMP_DIR", str(PROJECT_ROOT / "temp")))
 STRUCTURE_CACHE_DIR = TEMP_DIR / "structure_cache"
 VAULT_DIR = Path(os.environ.get("VAULT_DIR", str(PROJECT_ROOT / "vault" / "videos")))
 INDEX_DIR = Path(os.environ.get("INDEX_DIR", str(PROJECT_ROOT / "index")))

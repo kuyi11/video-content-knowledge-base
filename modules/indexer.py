@@ -85,6 +85,7 @@ class SearchResult:
     start: float
     end: float
     score: float
+    document_id: str = ""
     has_timestamp: bool = True
     source_path: str = ""
     chunk_type: str = "document"
@@ -913,7 +914,7 @@ class HybridIndex:
             results.append(
                 SearchResult(
                     rank=i + 1, chunk_id=cid, video_id=c.video_id,
-                    profile=c.profile,
+                    profile=c.profile, document_id=c.document_id,
                     source_url=c.source_url, content=c.content,
                     section=c.section, start=c.start, end=c.end,
                     score=round(score, 4), has_timestamp=c.has_timestamp,

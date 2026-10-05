@@ -44,6 +44,7 @@ class EvalCase:
     answer_points: tuple[str, ...]
     risk_level: str
     expected_answer: bool
+    expected_document_ids: tuple[str, ...] = ()
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -88,10 +89,11 @@ def load_cases(questions_path: Path, expected_path: Path) -> list[EvalCase]:
         expected_answer = bool(label.get("expected_answer", True))
         source_refs = tuple(str(item) for item in label.get("expected_source_refs", []))
         video_ids = tuple(str(item) for item in label.get("expected_video_ids", []))
+        document_ids = tuple(str(item) for item in label.get("expected_document_ids", []))
         explicit_sources = label.get("expected_sources")
-        if expected_answer and (not source_refs or not video_ids):
-            raise ValueError(f"Answerable case {case_id} needs expected video ids and source refs")
-        if not expected_answer and (source_refs or video_ids):
+        if expected_answer and not (source_refs or video_ids or document_ids):
+            raise ValueError(f"Answerable case {case_id} needs expected source or document ids")
+        if not expected_answer and (source_refs or video_ids or document_ids):
             raise ValueError(f"Unanswerable case {case_id} cannot have expected sources")
         if explicit_sources is None:
             if len(video_ids) > 1:
@@ -117,6 +119,7 @@ def load_cases(questions_path: Path, expected_path: Path) -> list[EvalCase]:
                 question=question,
                 category=str(question_row.get("category", "other")),
                 expected_video_ids=video_ids,
+                expected_document_ids=document_ids,
                 expected_source_refs=source_refs,
                 expected_sources=source_pairs,
                 answer_points=tuple(str(item) for item in label.get("answer_points", [])),
@@ -136,6 +139,7 @@ def _result_payload(result) -> dict:
         "rank": result.rank,
         "chunk_id": result.chunk_id,
         "video_id": result.video_id,
+        "document_id": getattr(result, "document_id", ""),
         "profile": result.profile,
         "section": result.section,
         "source_refs": sorted(_refs(result.content)),
@@ -146,12 +150,28 @@ def _result_payload(result) -> dict:
 
 
 def _is_relevant(case: EvalCase, result) -> bool:
+    if case.expected_document_ids:
+        return getattr(result, "document_id", "") in set(case.expected_document_ids)
     return any((result.video_id, ref) in set(case.expected_sources) for ref in _refs(result.content))
 
 
 def _retrieval_quality(case: EvalCase, results: Sequence, top_k: int) -> dict:
     """Compute precision and novelty-aware nDCG from reviewed source labels."""
     expected = set(case.expected_sources)
+    if case.expected_document_ids:
+        relevant = sum(
+            getattr(result, "document_id", "") in set(case.expected_document_ids)
+            for result in results[:top_k]
+        )
+        first = next(
+            (rank for rank, result in enumerate(results[:top_k], start=1)
+             if getattr(result, "document_id", "") in set(case.expected_document_ids)),
+            None,
+        )
+        return {
+            "precision_at_k": relevant / top_k,
+            "ndcg_at_k": 1.0 if first is not None else 0.0,
+        }
     if not case.expected_answer:
         return {"precision_at_k": None, "ndcg_at_k": None}
     relevant = sum(_is_relevant(case, result) for result in results[:top_k])
@@ -302,10 +322,19 @@ def evaluate_cases(
             for result in results
             for ref in _refs(result.content)
         }
+        retrieved_document_ids = {
+            getattr(result, "document_id", "")
+            for result in results
+            if getattr(result, "document_id", "")
+        }
         expected_refs = set(case.expected_sources)
         source_coverage = (
-            len(retrieved_refs & expected_refs) / len(expected_refs)
-            if case.expected_answer else None
+            len(retrieved_document_ids & set(case.expected_document_ids))
+            / len(set(case.expected_document_ids))
+            if case.expected_document_ids else (
+                len(retrieved_refs & expected_refs) / len(expected_refs)
+                if case.expected_answer else None
+            )
         )
         detail = {
             "id": case.id,
@@ -314,6 +343,7 @@ def evaluate_cases(
             "risk_level": case.risk_level,
             "expected_answer": case.expected_answer,
             "expected_video_ids": list(case.expected_video_ids),
+            "expected_document_ids": list(case.expected_document_ids),
             "expected_source_refs": list(case.expected_source_refs),
             "expected_sources": [
                 {"video_id": video_id, "source_ref": source_ref}

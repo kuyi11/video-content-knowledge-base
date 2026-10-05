@@ -1,0 +1,11 @@
+services:
+  rag-api:
+    environment:
+      VAULT_DIR: /vault/enterprise
+      OBSIDIAN_EXTERNAL_VAULTS: ""
+      INDEX_DIR: /data/enterprise-index
+      TEMP_DIR: /data/enterprise-temp
+    volumes:
+      - ${ENTERPRISE_VAULT_HOST_PATH:-./demo-data/enterprise-vault}:/vault/enterprise:ro
+      - ${ENTERPRISE_INDEX_HOST_PATH:-./demo-data/enterprise-index}:/data/enterprise-index
+      - ${ENTERPRISE_TEMP_HOST_PATH:-./demo-data/enterprise-temp}:/data/enterprise-temp

@@ -1,0 +1,22 @@
+{"id":"enterprise-product-functions","expected_answer":true,"expected_document_ids":["enterprise-product-overview-v12__default"],"answer_points":["工单创建","SLA","知识库检索","基础报表"],"risk_level":"low"}
+{"id":"enterprise-ticket-troubleshooting","expected_answer":true,"expected_document_ids":["enterprise-faq-and-troubleshooting-v12__default","enterprise-ticket-record-20261001__default"],"answer_points":["确认文件格式","检查编辑权限","记录错误码","转交管理员"],"risk_level":"low"}
+{"id":"enterprise-v12-changes","expected_answer":true,"expected_document_ids":["enterprise-product-overview-v12__default"],"answer_points":["SLA提醒","知识库引用展示","按队列和标签筛选工单","索引健康检查"],"risk_level":"low"}
+{"id":"enterprise-private-deployment","expected_answer":true,"expected_document_ids":["enterprise-private-deployment-v12__default"],"answer_points":["API服务","业务数据库","向量索引","对象存储","模型服务","备份策略"],"risk_level":"low"}
+{"id":"enterprise-order-mutation","expected_answer":false,"answer_points":[],"risk_level":"medium"}
+{"id":"enterprise-v11-baseline","expected_answer":true,"expected_document_ids":["enterprise-product-overview-v11__default"],"answer_points":["工单创建","队列分派","基础优先级","知识库检索"],"risk_level":"low"}
+{"id":"enterprise-version-table","expected_answer":true,"expected_document_ids":["enterprise-version-comparison-v11-v12__default"],"answer_points":["v1.2 新增 SLA 提醒","知识库引用展示","按标签筛选工单","索引健康检查"],"risk_level":"low"}
+{"id":"enterprise-permission-roles","expected_answer":true,"expected_document_ids":["enterprise-role-permission-matrix-v12__default","enterprise-permission-and-security-v12__default"],"answer_points":["管理员","编辑成员","阅读成员"],"risk_level":"medium"}
+{"id":"enterprise-permission-denied","expected_answer":true,"expected_document_ids":["enterprise-role-permission-matrix-v12__default","enterprise-permission-and-security-v12__default"],"answer_points":["阅读成员不能删除知识文档","阅读成员不能修改索引和模型配置"],"risk_level":"medium"}
+{"id":"enterprise-api-query","expected_answer":true,"expected_document_ids":["enterprise-api-examples-v12__default","enterprise-api-and-integration-v12__default"],"answer_points":["question","top_k","filters","semantic_grounding"],"risk_level":"medium"}
+{"id":"enterprise-api-auth-error","expected_answer":true,"expected_document_ids":["enterprise-api-examples-v12__default"],"answer_points":["401","422","503"],"risk_level":"medium"}
+{"id":"enterprise-ticket-record","expected_answer":true,"expected_document_ids":["enterprise-ticket-record-20261001__default"],"answer_points":["确认文档格式","检查编辑权限","记录错误码","转交管理员"],"risk_level":"medium"}
+{"id":"enterprise-sla-p1","expected_answer":true,"expected_document_ids":["enterprise-sla-policy-v12__default"],"answer_points":["P1","P2","P3","30 分钟","4 小时"],"risk_level":"low"}
+{"id":"enterprise-deployment-checklist","expected_answer":true,"expected_document_ids":["enterprise-private-deployment-checklist-v12__default"],"answer_points":["API 应用服务","业务数据库","向量索引","对象存储","模型服务","备份恢复"],"risk_level":"medium"}
+{"id":"enterprise-change-request","expected_answer":true,"expected_document_ids":["enterprise-change-request-cr2026003__default"],"answer_points":["工单标签筛选","不绕过成员权限","记录 request id"],"risk_level":"medium"}
+{"id":"enterprise-incident-postmortem","expected_answer":true,"expected_document_ids":["enterprise-incident-postmortem-20261002__default"],"answer_points":["向量索引卷未正确挂载","检查索引 generation","重建索引","执行带引用问答"],"risk_level":"medium"}
+{"id":"enterprise-citation-policy","expected_answer":true,"expected_document_ids":["enterprise-retrieval-and-citation-v12__default"],"answer_points":["只使用已接入资料","有证据时显示文档和章节引用"],"risk_level":"low"}
+{"id":"enterprise-order-write-api","expected_answer":false,"answer_points":[],"risk_level":"high"}
+{"id":"enterprise-permission-bypass","expected_answer":false,"answer_points":[],"risk_level":"high"}
+{"id":"enterprise-production-sla","expected_answer":false,"answer_points":[],"risk_level":"medium"}
+{"id":"enterprise-cross-document-troubleshooting","expected_answer":true,"expected_document_ids":["enterprise-faq-and-troubleshooting-v12__default","enterprise-ticket-record-20261001__default","enterprise-role-permission-matrix-v12__default"],"answer_points":["确认文档格式","检查编辑权限","记录错误码","转交管理员"],"risk_level":"medium"}
+{"id":"enterprise-cross-document-deployment","expected_answer":true,"expected_document_ids":["enterprise-private-deployment-checklist-v12__default","enterprise-incident-postmortem-20261002__default"],"answer_points":["检查持久化卷","检查索引 generation","重建索引","执行健康检查"],"risk_level":"medium"}

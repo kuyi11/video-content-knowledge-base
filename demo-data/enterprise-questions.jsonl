@@ -1,0 +1,22 @@
+{"id":"enterprise-product-functions","question":"星云企业工单平台有哪些核心功能？","category":"product_functions"}
+{"id":"enterprise-ticket-troubleshooting","question":"客服无法接收新工单时，应该如何排查？","category":"troubleshooting"}
+{"id":"enterprise-v12-changes","question":"v1.2 相比旧版本增加了哪些功能？","category":"version"}
+{"id":"enterprise-private-deployment","question":"企业要求私有化部署，需要准备哪些资源？","category":"deployment"}
+{"id":"enterprise-order-mutation","question":"这个系统能不能自动修改客户数据库中的订单金额？","category":"unsupported"}
+{"id":"enterprise-v11-baseline","question":"v1.1 的基线功能有哪些？","category":"version"}
+{"id":"enterprise-version-table","question":"v1.1 和 v1.2 在 SLA、引用、标签筛选和索引检查方面有什么差异？","category":"version"}
+{"id":"enterprise-permission-roles","question":"管理员、编辑成员和阅读成员分别可以做什么？","category":"permissions"}
+{"id":"enterprise-permission-denied","question":"阅读成员可以删除知识文档或修改模型配置吗？","category":"permissions"}
+{"id":"enterprise-api-query","question":"查询知识库 API 需要发送哪些主要字段？","category":"api"}
+{"id":"enterprise-api-auth-error","question":"调用查询 API 返回 401、422 和 503 时分别应该怎么处理？","category":"api"}
+{"id":"enterprise-ticket-record","question":"模拟工单 TK-1042 中，新工单没有进入队列时排查顺序是什么？","category":"troubleshooting"}
+{"id":"enterprise-sla-p1","question":"P1、P2、P3 工单的响应和处理计划时限分别是什么？","category":"sla"}
+{"id":"enterprise-deployment-checklist","question":"私有化部署上线前需要检查哪些基础设施和运维项？","category":"deployment"}
+{"id":"enterprise-change-request","question":"CR-2026-003 的变更内容、影响范围和验收条件是什么？","category":"change_management"}
+{"id":"enterprise-incident-postmortem","question":"索引服务不可用的模拟故障是如何定位和恢复的？","category":"troubleshooting"}
+{"id":"enterprise-citation-policy","question":"知识库回答什么时候可以显示引用？","category":"retrieval"}
+{"id":"enterprise-order-write-api","question":"查询 API 是否支持修改客户订单金额？","category":"unsupported"}
+{"id":"enterprise-permission-bypass","question":"能否通过标签筛选绕过成员权限查看未授权工单？","category":"unsupported"}
+{"id":"enterprise-production-sla","question":"这个模拟 SLA 规则是否代表真实客户合同承诺？","category":"unsupported"}
+{"id":"enterprise-cross-document-troubleshooting","question":"新工单没有进入队列时，结合 FAQ、模拟工单 TK-1042 和权限资料，应该按什么顺序排查？","category":"cross_document"}
+{"id":"enterprise-cross-document-deployment","question":"私有化部署出现 503 且索引为空时，结合部署检查表和故障复盘应该先检查什么？","category":"cross_document"}

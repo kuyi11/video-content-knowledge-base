@@ -53,7 +53,7 @@
 
 ## 3. 推荐公开资料来源
 
-公开资料只用于理解结构和整理来源，不要将官方文档整站复制到仓库或作品集。
+公开资料用于理解结构、整理来源和验证导入流程。只有在上游许可证允许且保留许可证文本时，才在仓库保存少量官方原文；其他来源只保存带链接和日期的摘要，不将官方文档整站复制到仓库或作品集。
 
 | 资料方向 | 官方来源 | 在 Demo 中的用途 |
 |---|---|---|
@@ -63,8 +63,12 @@
 | API 对接 | [FastGPT API 文档](https://doc.fastgpt.cn/zh-CN/openapi/intro) | 参考 API Key、应用调用和接口说明 |
 | 知识库 API | [FastGPT 知识库接口](https://doc.fastgpt.cn/zh-CN/openapi/dataset) | 参考创建、更新和管理知识库的场景 |
 | 私有化部署 | [FastGPT Docker Compose 部署](https://doc.fastgpt.cn/zh-CN/self-host/deploy/docker) | 参考数据库、向量库、AI Proxy 和资源配置 |
+| API 部署 | [FastAPI Deployment](https://fastapi.tiangolo.com/deployment/) | 参考应用上线、进程稳定性和部署边界 |
+| API 契约 | [OpenAPI Specification 3.2.1](https://spec.openapis.org/oas/3.2.1.html) | 参考请求、响应、安全方案和接口文档契约 |
+| 容器编排 | [Compose Specification](https://github.com/compose-spec/compose-spec/blob/main/spec.md) | 参考多容器服务、网络、卷、配置和依赖关系 |
+| Python 环境 | [Python venv](https://docs.python.org/3/library/venv.html) | 参考本地依赖隔离、环境重建和 Windows 激活方式 |
 | 企业权限 | [飞书知识库权限](https://www.feishu.cn/hc/zh-CN/articles/821998241087-%E5%BF%AB%E9%80%9F%E4%BA%86%E8%A7%A3%E7%9F%A5%E5%BA%93%E6%9D%83%E9%99%90) | 参考管理员、编辑成员、阅读成员和页面权限 |
-| 竞品参考 | [Dify 知识库介绍](https://docs.dify.ai/guides/knowledge-base/retrieval) | 作为低代码 RAG 和自部署能力的对比资料 |
+| 竞品参考 | [Dify Knowledge](https://docs.dify.ai/en/cloud/use-dify/knowledge/readme) | 参考知识库、分块、索引、混合检索和检索测试流程 |
 
 ## 4. 数据目录
 
@@ -79,8 +83,19 @@ demo-data/
     ├── 04-permission-and-security-v1.2.md
     ├── 05-api-and-integration-v1.2.md
     ├── 06-private-deployment-v1.2.md
-    └── 07-faq-and-troubleshooting-v1.2.md
+    ├── 07-faq-and-troubleshooting-v1.2.md
+    ├── 08-product-overview-v1.1.md
+    ├── 09-version-comparison-v1.1-v1.2.md
+    ├── 10-role-permission-matrix-v1.2.md
+    ├── 11-api-examples-v1.2.md
+    ├── 12-ticket-record-20261001.md
+    ├── 13-private-deployment-checklist-v1.2.md
+    ├── 14-change-request-cr-2026-003.md
+    ├── 15-sla-policy-v1.2.md
+    └── 16-incident-postmortem-20261002.md
 ```
+
+官方来源资料单独放在 `demo-data/official-sources/`，包含 FastAPI Deployment/Security、OpenAPI 3.2.1、Compose Specification、Python `venv` 的许可原文及中文摘要，也包含飞书知识库权限摘要、Dify 知识库分块/索引/检索测试摘要、Dify 项目许可证和 FastGPT 快速上手摘要。该目录不自动加入企业 Demo 默认索引，避免官方资料与模拟企业资料混用；审核后如需检索，应优先复制 `summaries/` 中选定资料到独立审核目录，再通过显式目录配置加入。
 
 ### 4.1 文档内容建议
 
@@ -204,16 +219,21 @@ title: 星云企业工单平台产品介绍 v1.2
 
 ## 7. 建立企业场景评测集
 
-建议先做 20 条人工标注问题：
+当前已建立 22 条人工标注问题：
 
 | 类型 | 数量 | 评测目标 |
 |---|---:|---|
-| 产品功能 | 6 | 基础召回和引用 |
-| 故障排查 | 4 | FAQ 检索和步骤完整性 |
-| 版本对比 | 3 | 版本区分 |
-| 部署与成本 | 3 | 方案资料召回 |
-| 无依据问题 | 2 | 证据不足处理 |
-| 跨文档问题 | 2 | 多文档证据覆盖 |
+| 产品功能与引用 | 2 | 基础召回、引用和回答边界 |
+| 故障排查与复盘 | 3 | 工单、FAQ、索引故障步骤完整性 |
+| 版本对比 | 2 | v1.1/v1.2 区分和版本回溯 |
+| 部署与 SLA | 3 | 资源检查、时限规则和部署边界 |
+| 权限与角色 | 2 | 角色能力和权限拒答 |
+| API 与变更 | 3 | 请求字段、错误码和变更验收 |
+| 检索与引用 | 1 | 引用生成条件 |
+| 跨文档问题 | 2 | 组合多个权威资料完成排查和部署判断 |
+| 无依据问题 | 4 | 生产写操作、权限绕过和合同承诺拒答 |
+
+`expected_document_ids` 可以列出多个权威资料；跨文档题按来源覆盖计算，不把单一目标文档误当成唯一正确答案。
 
 记录以下指标：
 
@@ -232,10 +252,14 @@ title: 星云企业工单平台产品介绍 v1.2
 在仓库根目录执行：
 
 ```powershell
-$repo = "D:\agent project\total\VideoContentKnowledgeBase-public"
+$repo = (Get-Location).Path
 
 $env:VAULT_DIR = "$repo\demo-data\enterprise-vault"
 $env:INDEX_DIR = "$repo\demo-data\enterprise-index"
+$env:TEMP_DIR = "$repo\demo-data\enterprise-temp"
+$env:OBSIDIAN_EXTERNAL_VAULTS = ""
+$env:TOOL_DIR = "D:\tool"
+$env:BGE_MODEL_PATH = "$env:TOOL_DIR\bge-m3"
 
 Set-Location $repo
 
@@ -266,6 +290,8 @@ Invoke-RestMethod `
     -ContentType "application/json" `
     -Body $body
 ```
+
+可重复执行的完整步骤见 [`docs/ENTERPRISE_KB_DEMO_RUNBOOK.md`](ENTERPRISE_KB_DEMO_RUNBOOK.md)。
 
 重点检查：
 
@@ -344,10 +370,10 @@ tools/enterprise_demo.ps1
 ## 12. 实施顺序
 
 1. 创建 `demo-data/enterprise-vault/`；
-2. 编写 7 篇模拟企业资料；
+2. 编写 16 篇模拟企业资料；
 3. 建立独立企业索引；
 4. 用 5 个核心问题验证召回和引用；
-5. 扩展到 20 条评测问题；
+5. 用 22 条离线评测问题验证召回、引用和拒答；
 6. 记录 Recall、MRR、Citation 和拒答结果；
 7. 绘制业务流程图和技术架构图；
 8. 编写 POC 评测报告；

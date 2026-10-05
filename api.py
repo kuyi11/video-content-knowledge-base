@@ -300,6 +300,8 @@ def query(
     citations = [
         {
             "chunk_id": item.get("chunk_id"),
+            "document_id": item.get("document_id"),
+            "section": item.get("section"),
             "source_refs": item.get("source_refs", []),
             "video_id": item.get("video_id", ""),
             "start": item.get("start"),
@@ -316,6 +318,19 @@ def query(
         "output_gate": output_gate or None,
         "evidence_audit": evidence_audit or None,
         "safety_gate": usage.get("safety_gate"),
+        "answer_provider": usage.get("answer_provider"),
+        "answer_model": usage.get("answer_model"),
+        "answer_call_completed": usage.get("answer_call_completed", False),
+        "llm_usage": {
+            key: usage[key]
+            for key in (
+                "prompt_eval_count",
+                "eval_count",
+                "prompt_eval_duration",
+                "eval_duration",
+            )
+            if key in usage
+        },
         "answer_confidence": usage.get("answer_confidence"),
         "evidence_coverage": usage.get("evidence_coverage"),
         "evidence_conflicts": usage.get("evidence_conflicts"),

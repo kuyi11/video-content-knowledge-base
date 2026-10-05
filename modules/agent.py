@@ -357,6 +357,13 @@ def ask_with_usage(messages: list, temp: float) -> tuple[str, dict]:
         for key in ("prompt_eval_count", "eval_count", "prompt_eval_duration", "eval_duration")
         if key in resp
     }
+    usage.update(
+        {
+            "answer_provider": "ollama",
+            "answer_model": LLM_CONFIG["model"],
+            "answer_call_completed": True,
+        }
+    )
     return resp["message"]["content"], usage
 
 
@@ -400,6 +407,9 @@ def answer_question_with_usage(
             evidence_audit=evidence_audit,
         )
         usage = {
+            "answer_provider": "ollama",
+            "answer_model": LLM_CONFIG["model"],
+            "answer_call_completed": False,
             "retrieval_log_path": str(log_path) if log_path else None,
             "claim_grounding": grounding,
             "output_gate": output_gate,
@@ -442,6 +452,9 @@ def answer_question_with_usage(
             evidence_audit=evidence_audit,
         )
         usage = {
+            "answer_provider": "ollama",
+            "answer_model": LLM_CONFIG["model"],
+            "answer_call_completed": False,
             "retrieval_log_path": str(log_path) if log_path else None,
             "safety_gate": safety.to_dict(),
             "claim_grounding": grounding,

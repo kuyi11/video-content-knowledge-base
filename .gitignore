@@ -53,6 +53,11 @@ tools/cookies/
 local-data/
 models/
 
+# === Public enterprise demo runtime data ===
+demo-data/enterprise-index/
+demo-data/enterprise-temp/
+demo-data/enterprise-reports/
+
 # === 环境变量 ===
 .env
 
