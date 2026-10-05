@@ -99,6 +99,10 @@ $env:API_TOKEN = "replace-with-a-long-random-token"
 demo-data/enterprise-reports/enterprise-demo-latest.json
 ```
 
+公开仓库中的脱敏基线证据见
+[`docs/demo-evidence/enterprise-demo-latest.json`](demo-evidence/enterprise-demo-latest.json)。
+运行时报告可能包含更详细的请求字段，因此继续保存在被忽略的本地报告目录。
+
 运行中的服务可用以下命令停止：
 
 ```powershell

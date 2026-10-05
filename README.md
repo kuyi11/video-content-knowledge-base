@@ -359,6 +359,8 @@ uv run --no-sync python eval/run_eval.py `
 [`docs/ENTERPRISE_KB_DEMO_RUNBOOK.md`](docs/ENTERPRISE_KB_DEMO_RUNBOOK.md)。原有
 `ENTERPRISE_DEMO.md` 保留为视频/医学主题演示；最终评测快照见
 `eval/baselines/final-evaluation-snapshot-20260919.json`。
+企业 Docker Demo 的脱敏运行证据见
+[`docs/demo-evidence/enterprise-demo-latest.json`](docs/demo-evidence/enterprise-demo-latest.json)。
 
 ### Obsidian
 
