@@ -18,10 +18,10 @@
 $repo = (Get-Location).Path
 Set-Location $repo
 git status --short --branch
-git pull --ff-only origin main
+git pull --ff-only origin public-main
 ```
 
-本地分支名是 `public-main`，远程公开分支名是 `main`。
+本地分支名和远程公开分支名都是 `public-main`；私有完整历史目录仍使用本地 `main` 分支。
 
 ## 本地真实数据
 
@@ -55,7 +55,7 @@ git grep -n -I -i -E "F:\\obsidian|D:\\agent project|vd_source=|douyin_cookies|N
 ```powershell
 git add .
 git commit -m "feat: describe the change"
-git push origin public-main:main
+git push origin public-main
 ```
 
 ## 注意事项

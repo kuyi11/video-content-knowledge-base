@@ -80,7 +80,7 @@ switch ($Action) {
 
         $cases = @(
             @{ name = "product_functions"; question = "星云企业工单平台有哪些核心功能？"; requireAnswer = $true; requireCitation = $true },
-            @{ name = "ticket_troubleshooting"; question = "客服无法接收新工单时，应该如何排查？"; requireAnswer = $true; requireCitation = $true },
+            @{ name = "ticket_troubleshooting"; question = "根据模拟工单 TK-1042，列出新工单未进入队列的排查步骤；只回答资料明确记录的步骤，并为每一步附上对应引用。"; requireAnswer = $true; requireCitation = $true },
             @{ name = "version_changes"; question = "v1.2 相比旧版本增加了哪些功能？"; requireAnswer = $true; requireCitation = $true },
             @{ name = "private_deployment"; question = "企业要求私有化部署，需要准备哪些资源？"; requireAnswer = $true; requireCitation = $true },
             @{ name = "unsupported_order_mutation"; question = "这个系统能不能自动修改客户数据库中的订单金额？"; requireAnswer = $true; requireCitation = $false; requireBoundary = $true }
@@ -100,13 +100,18 @@ switch ($Action) {
             $citationCount = @($response.citations).Count
             $domainMatched = $retrievedDomains.Count -gt 0 -and @($retrievedDomains | Where-Object { $_ -ne "enterprise" }).Count -eq 0
             $citationMatched = (-not $case.requireCitation) -or $citationCount -gt 0
+            $confidenceLevel = [string]$response.answer_confidence.level
+            $claimCount = [int]$response.output_gate.claim_count
+            $blockedClaimCount = [int]$response.output_gate.blocked_claim_count
+            $claimRetentionRatio = if ($claimCount -gt 0) { [math]::Round(($claimCount - $blockedClaimCount) / $claimCount, 4) } else { 1.0 }
+            $qualityMatched = $confidenceLevel -eq "high" -and $claimRetentionRatio -ge 0.5
             $boundaryMatched = $true
             if ($case.requireBoundary) {
                 $answerText = [string]$response.answer
                 $boundaryMatched = ($answerText -match "证据不足|不支持|无法|不能|产品边界|人工") -and ($answerText -notmatch "支持.*自动修改|可以.*自动修改|能够.*自动修改")
             }
-            $passed = $domainMatched -and $answerNonempty -and $citationMatched -and $boundaryMatched
-            $responses += [ordered]@{ name = $case.name; question = $case.question; retrieved_domains = $retrievedDomains; answer_nonempty = $answerNonempty; citation_count = $citationCount; boundary_matched = $boundaryMatched; output_gate = $response.output_gate; confidence = $response.answer_confidence; answer_provider = $response.answer_provider; answer_model = $response.answer_model; answer_call_completed = $response.answer_call_completed; semantic_judge_used = $response.evidence_conflicts.used_llm; llm_usage = $response.llm_usage; passed = $passed }
+            $passed = $domainMatched -and $answerNonempty -and $citationMatched -and $boundaryMatched -and $qualityMatched
+            $responses += [ordered]@{ name = $case.name; question = $case.question; retrieved_domains = $retrievedDomains; answer_nonempty = $answerNonempty; citation_count = $citationCount; boundary_matched = $boundaryMatched; quality_matched = $qualityMatched; confidence_level = $confidenceLevel; claim_count = $claimCount; blocked_claim_count = $blockedClaimCount; claim_retention_ratio = $claimRetentionRatio; output_gate = $response.output_gate; confidence = $response.answer_confidence; answer_provider = $response.answer_provider; answer_model = $response.answer_model; answer_call_completed = $response.answer_call_completed; semantic_judge_used = $response.evidence_conflicts.used_llm; llm_usage = $response.llm_usage; passed = $passed }
         }
         $record = [ordered]@{ generated_at = (Get-Date).ToString("o"); status = if (@($responses | Where-Object { -not $_.passed }).Count -eq 0) { "passed" } else { "failed" }; health = $health; cases = $responses }
         $resultPath = Join-Path $reportDir "enterprise-demo-latest.json"

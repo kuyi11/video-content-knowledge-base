@@ -93,7 +93,7 @@ $env:API_TOKEN = "replace-with-a-long-random-token"
 .\tools\enterprise_demo.ps1 -Action Demo
 ```
 
-`Demo` 会先在企业 Docker 服务镜像中执行 `tools/rebuild_index.py`，再启动 API，因此首次运行不要求主机预先生成企业索引。脚本使用 `docker-compose.yml` 加 `docker-compose.enterprise.yml`，将企业资料、索引和临时目录挂载到独立路径。它会执行五个快速演示问题，验证索引健康状态、企业域过滤、答案非空、正常问题引用，以及无依据问题的产品边界说明，并将脱敏结果写入：
+`Demo` 会先在企业 Docker 服务镜像中执行 `tools/rebuild_index.py`，再启动 API，因此首次运行不要求主机预先生成企业索引。脚本使用 `docker-compose.yml` 加 `docker-compose.enterprise.yml`，将企业资料、索引和临时目录挂载到独立路径。它会执行五个快速演示问题，验证索引健康状态、企业域过滤、答案非空、引用、`high` 置信度和至少 50% 的 Claim 保留率；无依据问题另外检查产品边界表达。结果写入：
 
 ```text
 demo-data/enterprise-reports/enterprise-demo-latest.json

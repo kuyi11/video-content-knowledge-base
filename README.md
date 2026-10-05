@@ -355,7 +355,9 @@ uv run --no-sync python eval/run_eval.py `
   --reranker-candidate-k 20
 ```
 
-完整的演示顺序、讲稿和请求示例见 `ENTERPRISE_DEMO.md`；最终评测快照见
+企业知识库 Demo 的完整运行顺序、请求示例和 Docker 命令见
+[`docs/ENTERPRISE_KB_DEMO_RUNBOOK.md`](docs/ENTERPRISE_KB_DEMO_RUNBOOK.md)。原有
+`ENTERPRISE_DEMO.md` 保留为视频/医学主题演示；最终评测快照见
 `eval/baselines/final-evaluation-snapshot-20260919.json`。
 
 ### Obsidian
