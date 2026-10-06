@@ -38,7 +38,8 @@ $env:OBSIDIAN_EXTERNAL_VAULTS = "F:\private-vault"
 ## 开发、测试与提交
 
 ```powershell
-python -m pytest -q
+uv sync --extra test --extra api --no-python-downloads
+uv run --no-sync python -m pytest -q
 git status --short
 git diff --check
 git ls-files vault tools/cookies eval/baselines

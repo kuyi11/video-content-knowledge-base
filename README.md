@@ -93,7 +93,10 @@ mamba create -p "D:\mambaProject\VideoContentKnowledgeBase\mamba_env" python=3.1
 
 # 在项目根目录执行，生成/使用 .venv
 uv venv --python "D:\mambaProject\VideoContentKnowledgeBase\mamba_env\python.exe" --system-site-packages
-uv sync --python "D:\mambaProject\VideoContentKnowledgeBase\mamba_env\python.exe" --no-python-downloads
+# 测试和 API 开发需要同步这两个可选依赖组
+uv sync --extra test --extra api `
+  --python "D:\mambaProject\VideoContentKnowledgeBase\mamba_env\python.exe" `
+  --no-python-downloads
 ```
 
 ### 2. 模型下载
