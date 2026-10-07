@@ -120,6 +120,53 @@ def test_generation_metrics_distinguish_abstention_and_grounding():
     assert report["summary"]["avg_prompt_tokens"] == 10.0
 
 
+def test_unanswerable_boundary_language_counts_as_abstention():
+    case = EvalCase(
+        id="negative-boundary",
+        question="negative-boundary",
+        category="unanswerable",
+        expected_video_ids=(),
+        expected_source_refs=(),
+        expected_sources=(),
+        answer_points=(),
+        risk_level="high",
+        expected_answer=False,
+    )
+
+    report = evaluate_cases(
+        [case],
+        lambda question, top_k: [],
+        answer=lambda question: ("系统不支持修改客户订单金额。", {}),
+    )
+
+    assert report["cases"][0]["abstained"] is True
+    assert report["summary"]["abstention_accuracy"] == 1.0
+
+
+def test_cohort_metrics_separate_core_demo_cases():
+    answerable = EvalCase(
+        id="core-answer",
+        question="core-answer",
+        category="fact",
+        expected_video_ids=("BV1",),
+        expected_source_refs=("S0001",),
+        expected_sources=(("BV1", "S0001"),),
+        answer_points=("needed point",),
+        risk_level="low",
+        expected_answer=True,
+        cohort="core_demo",
+    )
+    report = evaluate_cases(
+        [answerable],
+        lambda question, top_k: [_result(1, "BV1", "S0001")],
+        answer=lambda question: ("needed point [chunk-1 | S0001]", {}),
+    )
+
+    assert report["cases"][0]["cohort"] == "core_demo"
+    assert report["by_cohort"]["core_demo"]["case_count"] == 1
+    assert report["by_cohort"]["core_demo"]["answer_point_coverage"] == 1.0
+
+
 def test_generation_metrics_extract_video_id_from_chunk_citation():
     case = EvalCase(
         id="chunk-citation",

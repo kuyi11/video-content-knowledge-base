@@ -1,8 +1,8 @@
-{"id":"enterprise-product-functions","question":"星云企业工单平台有哪些核心功能？","category":"product_functions"}
-{"id":"enterprise-ticket-troubleshooting","question":"客服无法接收新工单时，应该如何排查？","category":"troubleshooting"}
-{"id":"enterprise-v12-changes","question":"v1.2 相比旧版本增加了哪些功能？","category":"version"}
-{"id":"enterprise-private-deployment","question":"企业要求私有化部署，需要准备哪些资源？","category":"deployment"}
-{"id":"enterprise-order-mutation","question":"这个系统能不能自动修改客户数据库中的订单金额？","category":"unsupported"}
+{"id":"enterprise-product-functions","question":"星云企业工单平台有哪些核心功能？","category":"product_functions","cohort":"core_demo"}
+{"id":"enterprise-ticket-troubleshooting","question":"客服无法接收新工单时，应该如何排查？","category":"troubleshooting","cohort":"core_demo"}
+{"id":"enterprise-v12-changes","question":"v1.2 相比旧版本增加了哪些功能？","category":"version","cohort":"core_demo"}
+{"id":"enterprise-private-deployment","question":"企业要求私有化部署，需要准备哪些资源？","category":"deployment","cohort":"core_demo"}
+{"id":"enterprise-order-mutation","question":"这个系统能不能自动修改客户数据库中的订单金额？","category":"unsupported","cohort":"core_demo"}
 {"id":"enterprise-v11-baseline","question":"v1.1 的基线功能有哪些？","category":"version"}
 {"id":"enterprise-version-table","question":"v1.1 和 v1.2 在 SLA、引用、标签筛选和索引检查方面有什么差异？","category":"version"}
 {"id":"enterprise-permission-roles","question":"管理员、编辑成员和阅读成员分别可以做什么？","category":"permissions"}

@@ -122,3 +122,32 @@ demo-data/enterprise-reports/enterprise-demo-latest.json
 - 当前 `version` 仍通过标题、正文和 `source` 表达，没有正式版本过滤字段。
 - 权限矩阵用于说明产品边界和拒答测试；运行时尚未实现按用户 ACL 过滤检索结果。
 - 企业 Demo 依赖本地 Embedding 模型和 Ollama 服务，未配置时只能完成静态语法和配置检查。
+
+## 完整评测与版本基线
+
+完整 22 条评测使用以下命令。问题文件中的 `cohort=core_demo` 会额外生成核心子集指标，避免把固定 Docker 场景与完整离线评测混为一组。
+
+```powershell
+$env:VAULT_DIR = "$repo\demo-data\enterprise-vault"
+$env:INDEX_DIR = "$repo\demo-data\enterprise-index"
+$env:TEMP_DIR = "$repo\demo-data\enterprise-temp"
+$env:OBSIDIAN_EXTERNAL_VAULTS = ""
+$env:BGE_MODEL_PATH = "D:\tool\bge-m3"
+
+uv run --no-sync python eval/run_eval.py `
+  --questions demo-data/enterprise-questions.jsonl `
+  --expected demo-data/enterprise-expected.jsonl `
+  --index-dir demo-data/enterprise-index `
+  --with-generation `
+  --claim-semantic-grounding `
+  --report-dir demo-data/enterprise-reports
+```
+
+当前评测基线与解读见 [`docs/ENTERPRISE_POC_EVALUATION_REPORT.md`](ENTERPRISE_POC_EVALUATION_REPORT.md)。架构说明、成本测算和面试问答分别见 [`docs/ENTERPRISE_ARCHITECTURE.md`](ENTERPRISE_ARCHITECTURE.md)、[`docs/ENTERPRISE_COST_MODEL.md`](ENTERPRISE_COST_MODEL.md) 和 [`docs/ENTERPRISE_INTERVIEW_QA.md`](ENTERPRISE_INTERVIEW_QA.md)。
+
+评测修改需要与企业问题和预期标签一起提交，提交前至少运行：
+
+```powershell
+uv run --no-sync pytest tests/test_rag_eval.py tests/test_enterprise_demo_evidence.py
+git diff --check
+```

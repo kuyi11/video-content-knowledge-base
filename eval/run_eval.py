@@ -30,6 +30,7 @@ VIDEO_ID_RE = re.compile(r"\bBV[A-Za-z0-9]+(?=[_\s\]|])")
 CHUNK_CITATION_RE = re.compile(r"\[\s*([A-Za-z0-9_-]+)\s*\|")
 ABSTENTION_MARKERS = (
     "不知道", "无法回答", "暂无相关", "没有相关", "无法从", "证据不足", "待人工核查",
+    "不能", "不支持", "不允许", "不代表", "不具备",
 )
 
 
@@ -45,6 +46,7 @@ class EvalCase:
     risk_level: str
     expected_answer: bool
     expected_document_ids: tuple[str, ...] = ()
+    cohort: str = ""
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -125,6 +127,7 @@ def load_cases(questions_path: Path, expected_path: Path) -> list[EvalCase]:
                 answer_points=tuple(str(item) for item in label.get("answer_points", [])),
                 risk_level=str(label.get("risk_level", "low")),
                 expected_answer=expected_answer,
+                cohort=str(question_row.get("cohort", "")).strip(),
             )
         )
     return cases
@@ -207,10 +210,19 @@ def _answer_metrics(
 ) -> dict:
     if not case.expected_answer:
         abstained = any(marker in answer for marker in ABSTENTION_MARKERS)
-        return {"abstained": abstained, "answer_point_coverage": None, "grounded": abstained}
+        return {
+            "abstained": abstained,
+            "abstention_error": not abstained,
+            "answer_point_coverage": None,
+            "grounded": abstained,
+        }
 
     normalized_answer = _normalized(answer)
-    points_found = sum(_normalized(point) in normalized_answer for point in case.answer_points)
+    missing_points = [
+        point for point in case.answer_points
+        if _normalized(point) not in normalized_answer
+    ]
+    points_found = len(case.answer_points) - len(missing_points)
     coverage = points_found / len(case.answer_points) if case.answer_points else None
     cited_videos = set(VIDEO_ID_RE.findall(answer))
     cited_chunks = set(CHUNK_CITATION_RE.findall(answer))
@@ -223,7 +235,9 @@ def _answer_metrics(
     grounded = coverage == 1.0 and citations_valid
     return {
         "abstained": False,
+        "abstention_error": False,
         "answer_point_coverage": coverage,
+        "answer_points_missing": missing_points,
         "cited_video_ids": sorted(cited_videos),
         "cited_chunk_ids": sorted(cited_chunks),
         "citations_valid": citations_valid,
@@ -341,6 +355,7 @@ def evaluate_cases(
             "question": case.question,
             "category": case.category,
             "risk_level": case.risk_level,
+            "cohort": case.cohort,
             "expected_answer": case.expected_answer,
             "expected_video_ids": list(case.expected_video_ids),
             "expected_document_ids": list(case.expected_document_ids),
@@ -439,6 +454,7 @@ def evaluate_cases(
         "summary": summary,
         "cases": details,
         "by_category": _by_category(details),
+        "by_cohort": _by_cohort(details),
         "claim_review_queue": review_queue,
     }
 
@@ -472,6 +488,63 @@ def _by_category(details: Sequence[dict]) -> dict:
     }
 
 
+def _cohort_metrics(rows: Sequence[dict]) -> dict:
+    """Return focused metrics for a labeled subset such as the core demo."""
+    answerable = [row for row in rows if row["expected_answer"]]
+    unanswerable = [row for row in rows if not row["expected_answer"]]
+    metrics = {
+        "case_count": len(rows),
+        "answerable_case_count": len(answerable),
+        "unanswerable_case_count": len(unanswerable),
+        "recall_at_k": _mean(row["hit_at_k"] for row in answerable),
+        "mrr": _mean(
+            1 / row["first_relevant_rank"] if row["first_relevant_rank"] else 0
+            for row in answerable
+        ),
+        "source_coverage": _mean(row["source_coverage"] for row in answerable),
+        "avg_retrieval_latency_ms": _mean(row["retrieval_latency_ms"] for row in rows),
+        "avg_total_retrieval_latency_ms": _mean(
+            (row.get("retrieval_latency_ms") or 0) + (row.get("rerank_latency_ms") or 0)
+            for row in rows
+        ),
+    }
+    if any("answer" in row for row in rows):
+        metrics.update(
+            {
+                "answer_point_coverage": _mean(
+                    row.get("answer_point_coverage") for row in answerable
+                ),
+                "abstention_accuracy": _mean(
+                    row.get("abstained") for row in unanswerable
+                ),
+                "abstention_error_count": sum(
+                    bool(row.get("abstention_error")) for row in unanswerable
+                ),
+                "answer_point_missing_case_count": sum(
+                    bool(row.get("answer_points_missing")) for row in answerable
+                ),
+                "claim_review_count": sum(
+                    len(row.get("usage", {}).get("claim_grounding", {}).get("review_claims", []))
+                    for row in rows
+                ),
+                **_aggregate_claim_metrics(rows),
+            }
+        )
+    return metrics
+
+
+def _by_cohort(details: Sequence[dict]) -> dict:
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for row in details:
+        cohort = str(row.get("cohort", "")).strip()
+        if cohort:
+            groups[cohort].append(row)
+    return {
+        cohort: _cohort_metrics(rows)
+        for cohort, rows in sorted(groups.items())
+    }
+
+
 def _markdown_report(report: dict) -> str:
     summary = report["summary"]
     lines = ["# RAG Evaluation Report", "", "## Summary", ""]
@@ -484,6 +557,21 @@ def _markdown_report(report: dict) -> str:
             f"{metrics['precision_at_k']} | {metrics['ndcg_at_k']} | "
             f"{metrics['mrr']} | {metrics['source_coverage']} |"
         )
+    if report.get("by_cohort"):
+        lines.extend([
+            "",
+            "## Focused Cohorts",
+            "",
+            "| Cohort | Cases | Recall@k | MRR | Source coverage | Answer point coverage | Abstention accuracy | Claim citation grounding | Claim review count |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ])
+        for cohort, metrics in report["by_cohort"].items():
+            lines.append(
+                f"| {cohort} | {metrics['case_count']} | {metrics['recall_at_k']} | "
+                f"{metrics['mrr']} | {metrics['source_coverage']} | "
+                f"{metrics.get('answer_point_coverage')} | {metrics.get('abstention_accuracy')} | "
+                f"{metrics.get('claim_citation_grounding_rate')} | {metrics.get('claim_review_count')} |"
+            )
     return "\n".join(lines) + "\n"
 
 

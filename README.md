@@ -68,6 +68,17 @@ evaluation outputs are intentionally excluded from Git history.
 监控、告警、分布式追踪、供应商账单或多租户权限系统。OCR 硬字幕、Playwright 音频抓流
 和 VB-Cable 仍属于未实现的采集扩展，不影响已有字幕/ASR 主链路。
 
+企业知识库售前 Demo 已作为独立场景提供：
+
+- [企业 Demo 实施方案](docs/ENTERPRISE_KB_DEMO_PLAN.md)
+- [企业 Demo 运行手册](docs/ENTERPRISE_KB_DEMO_RUNBOOK.md)
+- [企业 RAG 架构说明](docs/ENTERPRISE_ARCHITECTURE.md)
+- [企业 POC 评测报告](docs/ENTERPRISE_POC_EVALUATION_REPORT.md)
+- [Token 与部署成本测算](docs/ENTERPRISE_COST_MODEL.md)
+- [企业知识库面试问答](docs/ENTERPRISE_INTERVIEW_QA.md)
+
+该场景定位为基于模拟企业资料的 RAG POC、可复现 Demo 和售前参考实现。完整评测会同时报告核心 Demo 子集和 22 条问题全集，指标用于发现限制，不代表生产环境效果。
+
 Copy `.env.example` to `.env` or set environment variables in your shell to point
 the application at local data. `VAULT_DIR` controls generated notes,
 `OBSIDIAN_EXTERNAL_VAULTS` adds read-only knowledge sources, and `INDEX_DIR` stores
