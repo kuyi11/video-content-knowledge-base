@@ -376,6 +376,9 @@ uv run --no-sync python eval/run_eval.py `
 `eval/baselines/final-evaluation-snapshot-20260919.json`。
 企业 Docker Demo 的脱敏运行证据见
 [`docs/demo-evidence/enterprise-demo-latest.json`](docs/demo-evidence/enterprise-demo-latest.json)。
+该证据对应 2026-10-08 评测、代码基线 `22dc574`。Tag
+`v0.1-enterprise-rag-poc` 固定指向该代码基线；最新公开脱敏证据以
+`docs/demo-evidence/enterprise-demo-latest.json` 为准。本地完整报告未公开，因为其中包含未脱敏内容。
 
 ### Obsidian
 

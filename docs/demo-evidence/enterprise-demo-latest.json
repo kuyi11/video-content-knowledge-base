@@ -1,16 +1,10 @@
 {
   "schema_version": "enterprise-demo-evidence-v1",
-  "generated_at": "2026-10-06T06:52:44+08:00",
-  "environment": {
-    "runner": "Docker Compose",
-    "answer_provider": "ollama",
-    "answer_model": "qwen2.5:7b",
-    "semantic_grounding": true
-  },
+  "evaluation_date": "2026-10-08",
+  "code_baseline": "22dc574",
   "status": "passed",
   "health": {
     "status": "ok",
-    "service": "ready",
     "indexed_document_count": 16,
     "indexed_chunk_count": 45,
     "missing_from_index": [],
@@ -31,9 +25,9 @@
       "answer_call_completed": true,
       "confidence_level": "high",
       "claim_count": 2,
-      "blocked_claim_count": 0,
       "claim_retention_ratio": 1.0,
-      "citation_count": 2,
+      "blocked_claim_count": 0,
+      "citation_count": 1,
       "output_gate_action": "allow"
     },
     {
@@ -42,8 +36,8 @@
       "answer_call_completed": true,
       "confidence_level": "high",
       "claim_count": 4,
-      "blocked_claim_count": 0,
       "claim_retention_ratio": 1.0,
+      "blocked_claim_count": 0,
       "citation_count": 1,
       "output_gate_action": "allow"
     },
@@ -52,10 +46,10 @@
       "passed": true,
       "answer_call_completed": true,
       "confidence_level": "high",
-      "claim_count": 2,
-      "blocked_claim_count": 0,
+      "claim_count": 1,
       "claim_retention_ratio": 1.0,
-      "citation_count": 2,
+      "blocked_claim_count": 0,
+      "citation_count": 1,
       "output_gate_action": "allow"
     },
     {
@@ -64,8 +58,8 @@
       "answer_call_completed": true,
       "confidence_level": "high",
       "claim_count": 3,
-      "blocked_claim_count": 0,
       "claim_retention_ratio": 1.0,
+      "blocked_claim_count": 0,
       "citation_count": 3,
       "output_gate_action": "allow"
     },
@@ -75,10 +69,80 @@
       "answer_call_completed": true,
       "confidence_level": "high",
       "claim_count": 2,
-      "blocked_claim_count": 0,
       "claim_retention_ratio": 1.0,
+      "blocked_claim_count": 0,
       "citation_count": 2,
       "output_gate_action": "allow"
     }
-  ]
+  ],
+  "offline_evaluation": {
+    "generated_at": "2026-10-08T05:29:56+08:00",
+    "dataset": "simulated enterprise materials",
+    "mode": "offline",
+    "case_count": 22,
+    "answerable_case_count": 18,
+    "unanswerable_case_count": 4,
+    "metrics": {
+      "recall_at_k": 1.0,
+      "hit_rate_at_k": 1.0,
+      "precision_at_k": 0.3556,
+      "ndcg_at_k": 1.0,
+      "mrr": 0.7935,
+      "source_coverage": 0.8519,
+      "avg_retrieval_latency_ms": 172.3514,
+      "avg_rerank_latency_ms": null,
+      "avg_total_retrieval_latency_ms": 172.3514,
+      "reranker_enabled": false,
+      "heuristic_grounded_answer_rate": 0.3333,
+      "abstention_accuracy": 1.0,
+      "answer_point_coverage": 0.4843,
+      "avg_generation_latency_ms": 4953.6999,
+      "avg_prompt_tokens": 1188.6364,
+      "avg_completion_tokens": 131.7727,
+      "token_metering_available": true,
+      "evaluated_claim_count": 38,
+      "claim_citation_grounding_rate": 0.8947,
+      "semantic_evaluated_claim_count": 38,
+      "claim_semantic_grounding_rate": 0.7895,
+      "claim_review_count": 8
+    },
+    "boundary_expression": {
+      "matched_count": 4,
+      "case_count": 4,
+      "method": "phrase-rule matching",
+      "note": "Measures boundary phrase matches in the unsupported/unauthorized subset only; it is not a general or production refusal-accuracy measure."
+    },
+    "core_demo": {
+      "case_count": 5,
+      "answerable_case_count": 4,
+      "unanswerable_case_count": 1,
+      "metrics": {
+        "recall_at_k": 1.0,
+        "mrr": 0.875,
+        "source_coverage": 0.875,
+        "avg_retrieval_latency_ms": 232.684,
+        "avg_total_retrieval_latency_ms": 232.684,
+        "answer_point_coverage": 0.6458,
+        "abstention_accuracy": 1.0,
+        "abstention_error_count": 0,
+        "answer_point_missing_case_count": 2,
+        "claim_review_count": 4,
+        "evaluated_claim_count": 12,
+        "claim_citation_grounding_rate": 0.6667,
+        "semantic_evaluated_claim_count": 12,
+        "claim_semantic_grounding_rate": 0.6667
+      },
+      "boundary_expression": {
+        "matched_count": 1,
+        "case_count": 1,
+        "method": "phrase-rule matching",
+        "note": "Measures a phrase-rule match in the unsupported/unauthorized subset only; it is not a general or production refusal-accuracy measure."
+      }
+    }
+  },
+  "evidence_scope": {
+    "docker_demo": "Docker Compose run generated 2026-10-08T05:33:48+08:00; five fixed scenarios, reported separately from offline evaluation.",
+    "offline_evaluation": "Twenty-two question full set with a five-question core_demo subset; metrics are synthetic-material offline observations.",
+    "local_full_report": "Not published because the local report contains unsanitized evaluation content."
+  }
 }
