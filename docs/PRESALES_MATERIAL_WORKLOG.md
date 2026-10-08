@@ -282,3 +282,11 @@ git log -1 --oneline --decorate
 验证结果：PPTX 为 10 页，包完整性、布局及字体检查通过；PDF 为 10 页，逐页渲染视觉检查通过，中文显示正常、图片清晰；第 7 页 ACL 未实现说明和第 8 页短语规则脚注存在；全稿未发现“转人工”“权限过滤”“Abstention accuracy”残留。完整测试 `213 passed, 1 warning`。PPTX SHA-256：`b67ef848bd00a44449459fc76fa4e5c3b0f5e7c4d5ea7d4c5a183e356cd39880`。
 
 修改决定：只修正文案和证据链接，不改评测数字；边界表达命中率注明为短语规则结果，不代表通用拒答能力；人工边界统一表述为“提示人工确认”；业务域过滤明确标注 `domain=enterprise`。本地完整评测报告位于 `.gitignore` 排除的 `demo-data/enterprise-reports/`，其原因是报告内容未脱敏；公开同步使用 `docs/demo-evidence/enterprise-demo-latest.json`。Tag `v0.1-enterprise-rag-poc` 仍固定于 `22dc574`，未移动或重打。
+
+### 2026-10-08：成本假设表与 2 分钟 Demo 脚本
+
+输入资料：`docs/ENTERPRISE_COST_MODEL.md`、`docs/ENTERPRISE_KB_DEMO_RUNBOOK.md`、`docs/ENTERPRISE_POC_EVALUATION_REPORT.md` 和 2026-10-08 脱敏证据。
+
+生成产物：更新 `docs/ENTERPRISE_COST_MODEL.md`，新增参数基准、供应商价格输入栏和月度用量/成本公式；新增 `docs/ENTERPRISE_DEMO_VIDEO_SCRIPT.md`，按时间轴区分 Docker 5/5、22 条完整离线评测和 5 条 `core_demo` 子集，并明确短语规则、SSO/ACL 与人工确认边界。
+
+验证结果：参数覆盖问题量、Token、工作日、Embedding/重排调用、应用与数据资源、存储、GPU 和运维；单位价格均留为待核实输入，未表述为报价。讲稿时长合计 2 分钟，`git diff --check` 通过。

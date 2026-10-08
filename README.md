@@ -75,6 +75,7 @@ evaluation outputs are intentionally excluded from Git history.
 - [企业 RAG 架构说明](docs/ENTERPRISE_ARCHITECTURE.md)
 - [企业 POC 评测报告](docs/ENTERPRISE_POC_EVALUATION_REPORT.md)
 - [Token 与部署成本测算](docs/ENTERPRISE_COST_MODEL.md)
+- [2 分钟 Demo 视频脚本](docs/ENTERPRISE_DEMO_VIDEO_SCRIPT.md)
 - [企业知识库面试问答](docs/ENTERPRISE_INTERVIEW_QA.md)
 - [售前作品集制作工作日志](docs/PRESALES_MATERIAL_WORKLOG.md)
 
