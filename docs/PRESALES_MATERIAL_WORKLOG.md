@@ -290,3 +290,7 @@ git log -1 --oneline --decorate
 生成产物：更新 `docs/ENTERPRISE_COST_MODEL.md`，新增参数基准、供应商价格输入栏和月度用量/成本公式；新增 `docs/ENTERPRISE_DEMO_VIDEO_SCRIPT.md`，按时间轴区分 Docker 5/5、22 条完整离线评测和 5 条 `core_demo` 子集，并明确短语规则、SSO/ACL 与人工确认边界。
 
 验证结果：参数覆盖问题量、Token、工作日、Embedding/重排调用、应用与数据资源、存储、GPU 和运维；单位价格均留为待核实输入，未表述为报价。讲稿时长合计 2 分钟，`git diff --check` 通过。
+
+### 2026-10-09：v5 错字复核与 PDF 重新导出
+
+检查 v5 第 3 页 PPTX XML，实际文字为“拒答边界”，没有“拒签边界”残留，因此保持已正确的 PPTX 不变。使用 `D:\.codex-pptx-build\export-pdf.ps1` 重新导出 `portfolio/enterprise-rag-presales/enterprise-rag-presales-v5.pdf`；`pdfinfo` 确认 10 页、960 × 540 pt。PDF SHA-256：`98328818b5d79a27552128947f1a85bb83120450ad0c44a39a22c5a680fd7ba5`。公开证据仍为 2026-10-08 / `22dc574`，包含 Docker 5/5、22 条完整指标与 5 条 `core_demo` 指标；成本表和 Demo 脚本已存在。
