@@ -5,6 +5,8 @@ services:
       OBSIDIAN_EXTERNAL_VAULTS: ""
       INDEX_DIR: /data/enterprise-index
       TEMP_DIR: /data/enterprise-temp
+      LLM_QA_TEMPERATURE: ${LLM_QA_TEMPERATURE:-0}
+      LLM_QA_SEED: ${LLM_QA_SEED:-42}
     volumes:
       - ${ENTERPRISE_VAULT_HOST_PATH:-./demo-data/enterprise-vault}:/vault/enterprise:ro
       - ${ENTERPRISE_INDEX_HOST_PATH:-./demo-data/enterprise-index}:/data/enterprise-index

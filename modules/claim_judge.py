@@ -8,6 +8,8 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from typing import Protocol
 
+from config import llm_generation_options
+
 
 SEMANTIC_VERDICTS = frozenset({"supported", "contradicted", "insufficient_evidence"})
 CONFIDENCE_LEVELS = frozenset({"high", "medium", "low"})
@@ -115,7 +117,7 @@ class OllamaClaimJudge:
             model=self.model,
             messages=messages,
             format="json",
-            options={"temperature": 0},
+            options=llm_generation_options(0),
         )
         content = response["message"]["content"]
         try:
@@ -139,6 +141,6 @@ class OllamaClaimJudge:
                 model=self.model,
                 messages=messages,
                 format="json",
-                options={"temperature": 0},
+                options=llm_generation_options(0),
             )
             return parse_judgment(retry["message"]["content"], allowed_ids)

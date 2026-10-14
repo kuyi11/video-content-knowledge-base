@@ -8,7 +8,13 @@ from dataclasses import dataclass
 
 import ollama
 
-from config import QUERY_PLANNER_ENABLED, QUERY_PLANNER_MAX_SUBQUERIES, QUERY_PLANNER_MODEL, LLM_CONFIG
+from config import (
+    LLM_CONFIG,
+    QUERY_PLANNER_ENABLED,
+    QUERY_PLANNER_MAX_SUBQUERIES,
+    QUERY_PLANNER_MODEL,
+    llm_generation_options,
+)
 from modules.query_rewriter import QueryRewriter
 
 
@@ -95,7 +101,7 @@ class QueryPlanner:
                 },
             ],
             format="json",
-            options={"temperature": 0},
+            options=llm_generation_options(0),
         )
         payload = json.loads(response["message"]["content"])
         query = re.sub(r"\s+", " ", str(payload.get("query", ""))).strip()
@@ -141,7 +147,7 @@ class QueryPlanner:
                 },
             ],
             format="json",
-            options={"temperature": 0},
+            options=llm_generation_options(0),
         )
         payload = json.loads(response["message"]["content"])
         status = str(payload.get("status", "")).lower()
@@ -195,7 +201,7 @@ class QueryPlanner:
                 },
             ],
             format="json",
-            options={"temperature": 0},
+            options=llm_generation_options(0),
         )
         return json.loads(response["message"]["content"])
 
@@ -284,7 +290,7 @@ def evaluate_subquery_coverage(
                     {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
                 ],
                 format="json",
-                options={"temperature": 0},
+                options=llm_generation_options(0),
             )
             judged = json.loads(response["message"]["content"])
             status = str(judged.get("status", "")).lower()
@@ -340,7 +346,7 @@ def detect_evidence_conflicts(results: list[dict], *, client, model: str) -> dic
                 {"role": "user", "content": json.dumps({"evidence": evidence}, ensure_ascii=False)},
             ],
             format="json",
-            options={"temperature": 0},
+            options=llm_generation_options(0),
         )
         payload = json.loads(response["message"]["content"])
         status = str(payload.get("status", "")).lower()

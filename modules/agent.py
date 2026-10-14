@@ -14,6 +14,7 @@ from config import (
     QUERY_LOGGING_ENABLED,
     SEMANTIC_GROUNDING_MAX_CLAIMS,
     TERMINOLOGY_REVIEW_PATH,
+    llm_generation_options,
 )
 from modules.claim_judge import ClaimJudge, OllamaClaimJudge
 from modules.claim_grounding import is_abstention_answer, not_applicable, validate_claims
@@ -350,7 +351,7 @@ def ask_with_usage(messages: list, temp: float) -> tuple[str, dict]:
     resp = _ollama_client.chat(
         model=LLM_CONFIG["model"],
         messages=messages,
-        options={"temperature": temp},
+        options=llm_generation_options(temp),
     )
     usage = {
         key: resp[key]
@@ -481,7 +482,7 @@ def answer_question_with_usage(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"知识片段：\n{context}\n\n问题：{question}"},
         ],
-        0.3,
+        LLM_CONFIG["qa_temperature"],
     )
     if is_abstention_answer(answer):
         grounding = not_applicable(

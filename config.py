@@ -200,6 +200,9 @@ API_TOKEN = os.environ.get("API_TOKEN", "").strip()
 ALLOW_REMOTE_LLM = os.environ.get("ALLOW_REMOTE_LLM", "false").strip().lower() in {"1", "true", "yes", "on"}
 LLM_NUM_CTX = int(os.environ.get("LLM_NUM_CTX", "16384"))
 LLM_NUM_PREDICT = int(os.environ.get("LLM_NUM_PREDICT", "4096"))
+LLM_QA_TEMPERATURE = float(os.environ.get("LLM_QA_TEMPERATURE", "0.3"))
+_llm_qa_seed = os.environ.get("LLM_QA_SEED", "").strip()
+LLM_QA_SEED = int(_llm_qa_seed) if _llm_qa_seed else None
 LLM_KEEP_ALIVE = os.environ.get("LLM_KEEP_ALIVE", "15m")
 LLM_TIMEOUT_SECONDS = max(1.0, float(os.environ.get("LLM_TIMEOUT_SECONDS", "180")))
 RERANKER_MODEL_PATH = os.environ.get("RERANKER_MODEL_PATH", "").strip()
@@ -259,9 +262,18 @@ LLM_CONFIG = {
     "model": OLLAMA_MODEL,
     "num_ctx": LLM_NUM_CTX,
     "num_predict": LLM_NUM_PREDICT,
+    "qa_temperature": LLM_QA_TEMPERATURE,
+    "qa_seed": LLM_QA_SEED,
     "keep_alive": LLM_KEEP_ALIVE,
     "timeout_seconds": LLM_TIMEOUT_SECONDS,
 }
+
+
+def llm_generation_options(temperature: float) -> dict:
+    options = {"temperature": temperature}
+    if LLM_QA_SEED is not None:
+        options["seed"] = LLM_QA_SEED
+    return options
 
 if OLLAMA_HOST and not _is_local_llm_host(OLLAMA_HOST):
     logging.getLogger(__name__).warning("Remote OLLAMA_HOST explicitly enabled: %s", OLLAMA_HOST)

@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import config
 import modules.agent as agent
 
 
@@ -128,6 +129,49 @@ def test_model_abstention_is_excluded_from_claim_grounding(tmp_path, monkeypatch
     assert usage["claim_grounding"]["status"] == "not_applicable"
     assert usage["claim_grounding"]["reason"] == "model_abstention"
     assert usage["output_gate"]["action"] == "not_applicable"
+
+
+def test_answer_uses_configured_qa_temperature(monkeypatch):
+    captured = {}
+    monkeypatch.setitem(agent.LLM_CONFIG, "qa_temperature", 0.0)
+
+    class Safety:
+        action = "allow"
+        matched_terms = []
+
+        def to_dict(self):
+            return {"action": self.action, "matched_terms": self.matched_terms}
+
+    monkeypatch.setattr(
+        agent,
+        "evaluate_medical_safety",
+        lambda *args, **kwargs: Safety(),
+    )
+
+    def fake_ask(messages, temperature):
+        captured["temperature"] = temperature
+        return "结论 [BVmedical_raw_1 | S0001]", {"answer_call_completed": True}
+
+    monkeypatch.setattr(agent, "ask_with_usage", fake_ask)
+    agent.answer_question_with_usage(FakeEngine(), "视频讲了什么？")
+
+    assert captured["temperature"] == 0.0
+
+
+def test_ask_with_usage_passes_fixed_seed_to_ollama(monkeypatch):
+    captured = {}
+
+    class Client:
+        def chat(self, **kwargs):
+            captured.update(kwargs)
+            return {"message": {"content": "ok"}}
+
+    monkeypatch.setattr(agent, "_ollama_client", Client())
+    monkeypatch.setattr(config, "LLM_QA_SEED", 42)
+
+    agent.ask_with_usage([], 0.0)
+
+    assert captured["options"] == {"temperature": 0.0, "seed": 42}
 
 
 def test_output_gate_removes_unadmitted_claim_but_keeps_admitted_claim(tmp_path, monkeypatch):

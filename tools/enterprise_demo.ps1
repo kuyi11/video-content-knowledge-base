@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("Demo", "Build", "Up", "Down", "Config", "Logs")]
     [string]$Action = "Demo",
     [int]$ApiPort = 8001,
@@ -86,6 +86,8 @@ switch ($Action) {
             @{ name = "unsupported_order_mutation"; question = "这个系统能不能自动修改客户数据库中的订单金额？"; requireAnswer = $true; requireCitation = $false; requireBoundary = $true }
         )
         $responses = @()
+        $qaTemperature = if ($env:LLM_QA_TEMPERATURE) { [double]$env:LLM_QA_TEMPERATURE } else { 0.0 }
+        $qaSeed = if ($env:LLM_QA_SEED) { [int]$env:LLM_QA_SEED } else { 42 }
         foreach ($case in $cases) {
             $body = @{
                 question = $case.question
@@ -96,6 +98,7 @@ switch ($Action) {
             } | ConvertTo-Json -Depth 10
             $response = Invoke-RestMethod -Method Post -Uri "$baseUri/query" -Headers $headers -ContentType "application/json" -Body $body
             $retrievedDomains = @($response.retrieval.results | ForEach-Object { $_.domain } | Sort-Object -Unique)
+            $retrievedChunks = @($response.retrieval.results | ForEach-Object { [pscustomobject]@{ document_id = $_.document_id; section = $_.section; chunk_id = $_.chunk_id } })
             $answerNonempty = -not [string]::IsNullOrWhiteSpace([string]$response.answer)
             $citationCount = @($response.citations).Count
             $domainMatched = $retrievedDomains.Count -gt 0 -and @($retrievedDomains | Where-Object { $_ -ne "enterprise" }).Count -eq 0
@@ -111,9 +114,9 @@ switch ($Action) {
                 $boundaryMatched = ($answerText -match "证据不足|不支持|无法|不能|产品边界|人工") -and ($answerText -notmatch "支持.*自动修改|可以.*自动修改|能够.*自动修改")
             }
             $passed = $domainMatched -and $answerNonempty -and $citationMatched -and $boundaryMatched -and $qualityMatched
-            $responses += [ordered]@{ name = $case.name; question = $case.question; retrieved_domains = $retrievedDomains; answer_nonempty = $answerNonempty; citation_count = $citationCount; boundary_matched = $boundaryMatched; quality_matched = $qualityMatched; confidence_level = $confidenceLevel; claim_count = $claimCount; blocked_claim_count = $blockedClaimCount; claim_retention_ratio = $claimRetentionRatio; output_gate = $response.output_gate; confidence = $response.answer_confidence; answer_provider = $response.answer_provider; answer_model = $response.answer_model; answer_call_completed = $response.answer_call_completed; semantic_judge_used = $response.evidence_conflicts.used_llm; llm_usage = $response.llm_usage; passed = $passed }
+            $responses += [ordered]@{ name = $case.name; question = $case.question; answer = [string]$response.answer; retrieved_domains = $retrievedDomains; retrieved_chunks = $retrievedChunks; answer_nonempty = $answerNonempty; citation_count = $citationCount; boundary_matched = $boundaryMatched; quality_matched = $qualityMatched; confidence_level = $confidenceLevel; claim_count = $claimCount; blocked_claim_count = $blockedClaimCount; claim_retention_ratio = $claimRetentionRatio; output_gate = $response.output_gate; confidence = $response.answer_confidence; answer_provider = $response.answer_provider; answer_model = $response.answer_model; answer_call_completed = $response.answer_call_completed; semantic_judge_used = $response.evidence_conflicts.used_llm; llm_usage = $response.llm_usage; passed = $passed }
         }
-        $record = [ordered]@{ generated_at = (Get-Date).ToString("o"); status = if (@($responses | Where-Object { -not $_.passed }).Count -eq 0) { "passed" } else { "failed" }; health = $health; cases = $responses }
+        $record = [ordered]@{ generated_at = (Get-Date).ToString("o"); status = if (@($responses | Where-Object { -not $_.passed }).Count -eq 0) { "passed" } else { "failed" }; generation = [ordered]@{ temperature = $qaTemperature; seed = $qaSeed }; health = $health; cases = $responses }
         $resultPath = Join-Path $reportDir "enterprise-demo-latest.json"
         $record | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 $resultPath
         Write-Output "Enterprise demo report: $resultPath"
